@@ -17,19 +17,22 @@ config.suffixes = ['.c', '.cpp', '.test']
 
 # C & CXX flags.
 c_flags = ([config.target_cflags] +
-           ["-pthread",
-           "-fPIE",
-           "-pie",
-           "-O0",
-           "-UNDEBUG",
-           "-ldl",
-           "-Wl,--gc-sections"])
+           ["-O0",
+            "-UNDEBUG"])
 
-# Android doesn't want -lrt.
-if not config.android:
-  c_flags += ["-lrt"]
+if config.host_os != 'Windows':
+  c_flags += ["-pthread",
+              "-fPIE",
+              "-pie",
+              "-ldl",
+              "-Wl,--gc-sections"]
+  # Android doesn't want -lrt.
+  if not config.android:
+    c_flags += ["-lrt"]
 
-cxx_flags = (c_flags + config.cxx_mode_flags + ["-std=c++11"])
+cxx_flags = (c_flags + config.cxx_mode_flags)
+if config.host_os != 'Windows':
+  cxx_flags += ["-std=c++11"]
 
 scudo_flags = ["-fsanitize=scudo"]
 
@@ -59,6 +62,6 @@ if default_scudo_opts:
 config.substitutions.append(('%env_scudo_opts=',
                              'env SCUDO_OPTIONS=' + default_scudo_opts))
 
-# Hardened Allocator tests are currently supported on Linux only.
-if config.host_os not in ['Linux']:
+# Hardened Allocator tests are currently supported on Linux and Windows only.
+if config.host_os not in ['Linux', 'Windows']:
    config.unsupported = True

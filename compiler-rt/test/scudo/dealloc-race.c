@@ -1,3 +1,5 @@
+// UNSUPPORTED: windows
+
 // RUN: %clang_scudo %s -O2 -o %t
 // RUN: %env_scudo_opts="QuarantineChunksUpToSize=0" %run %t 2>&1
 

@@ -446,6 +446,13 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
+  if (TC.getSanitizerArgs().needsScudoRt()) {
+    for (const auto &Lib : {"scudo", "scudo_cxx"}) {
+      CmdArgs.push_back(TC.getCompilerRTArgString(Args, Lib));
+    }
+    CmdArgs.push_back(Args.MakeArgString("-include:malloc"));
+  }
+
   Args.AddAllArgValues(CmdArgs, options::OPT__SLASH_link);
 
   // Control Flow Guard checks
@@ -1403,6 +1410,7 @@ SanitizerMask MSVCToolChain::getSupportedSanitizers() const {
   Res |= SanitizerKind::PointerSubtract;
   Res |= SanitizerKind::Fuzzer;
   Res |= SanitizerKind::FuzzerNoLink;
+  Res |= SanitizerKind::Scudo;
   Res &= ~SanitizerKind::CFIMFCall;
   return Res;
 }

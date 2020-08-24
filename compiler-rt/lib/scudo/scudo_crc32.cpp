@@ -15,10 +15,13 @@
 
 namespace __scudo {
 
+// Can't override this with weak symbols on Windows
+#if !defined(_WIN32)
 #if defined(__SSE4_2__) || defined(__ARM_FEATURE_CRC32)
 u32 computeHardwareCRC32(u32 Crc, uptr Data) {
   return CRC32_INTRINSIC(Crc, Data);
 }
 #endif  // defined(__SSE4_2__) || defined(__ARM_FEATURE_CRC32)
+#endif  // defined(_WIN32)
 
 }  // namespace __scudo

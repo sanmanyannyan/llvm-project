@@ -2,7 +2,7 @@
 // RUN:                                                 %run %t valid   2>&1
 // RUN:                                             not %run %t invalid 2>&1 | FileCheck %s
 // RUN: %env_scudo_opts=allocator_may_return_null=1     %run %t invalid 2>&1
-// UNSUPPORTED: android
+// UNSUPPORTED: android, windows
 
 // Tests that valloc and pvalloc work as intended.
 

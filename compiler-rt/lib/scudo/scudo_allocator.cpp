@@ -44,6 +44,12 @@ static u32 Cookie;
 // at compilation or at runtime.
 static atomic_uint8_t HashAlgorithm = { CRC32Software };
 
+#if !SANITIZER_SUPPORTS_WEAK_HOOKS
+SANITIZER_WEAK_ATTRIBUTE u32 computeHardwareCRC32(u32 Crc, uptr Data) {
+  return computeSoftwareCRC32(Crc, Data);
+}
+#endif
+
 inline u32 computeCRC32(u32 Crc, uptr Value, uptr *Array, uptr ArraySize) {
   // If the hardware CRC32 feature is defined here, it was enabled everywhere,
   // as opposed to only for scudo_crc32.cpp. This means that other hardware
@@ -609,7 +615,7 @@ NOINLINE void Allocator::performSanityChecks() {
   // last size class minus the header size, in multiples of MinAlignment.
   UnpackedHeader Header = {};
   const uptr MaxPrimaryAlignment =
-      1 << MostSignificantSetBitIndex(SizeClassMap::kMaxSize - MinAlignment);
+      (uptr)1U << MostSignificantSetBitIndex(SizeClassMap::kMaxSize - MinAlignment);
   const uptr MaxOffset =
       (MaxPrimaryAlignment - Chunk::getHeaderSize()) >> MinAlignmentLog;
   Header.Offset = MaxOffset;

@@ -10,12 +10,29 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <vector>
 
 #include <sanitizer/allocator_interface.h>
 #include <sanitizer/scudo_interface.h>
+
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
+void sleep_ms(unsigned int ms) {
+#if defined(_WIN32)
+  Sleep(ms);
+#else
+  usleep(ms * 1000U);
+#endif
+}
 
 int main(int argc, char **argv)
 {
@@ -57,7 +74,7 @@ int main(int argc, char **argv)
     }
     // Set the soft RSS limit to 1Mb.
     __scudo_set_rss_limit(1, 0);
-    usleep(20000);
+    sleep_ms(200);
     // The following allocation should return NULL.
     void *p = malloc(size);
     assert(!p);
@@ -83,7 +100,7 @@ int main(int argc, char **argv)
     }
     // Set the hard RSS limit to 1Mb
     __scudo_set_rss_limit(1, 1);
-    usleep(20000);
+    sleep_ms(200);
     // The following should trigger our death.
     void *p = malloc(size);
   }

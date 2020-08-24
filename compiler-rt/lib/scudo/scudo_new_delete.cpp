@@ -19,7 +19,32 @@
 
 using namespace __scudo;
 
+// C++ operators can't have dllexport attributes on Windows. We export them
+// anyway by passing extra -export flags to the linker, which is exactly that
+// dllexport would normally do. We need to export them in order to make the
+// VS2015 dynamic CRT (MD) work.
+#if SANITIZER_WINDOWS
+#define CXX_OPERATOR_ATTRIBUTE
+#define COMMENT_EXPORT(sym) __pragma(comment(linker, "/export:" sym))
+#ifdef _WIN64
+COMMENT_EXPORT("??2@YAPEAX_K@Z")                    // operator new
+COMMENT_EXPORT("??2@YAPEAX_KAEBUnothrow_t@std@@@Z") // operator new nothrow
+COMMENT_EXPORT("??3@YAXPEAX@Z")                     // operator delete
+COMMENT_EXPORT("??3@YAXPEAX_K@Z")                   // sized operator delete
+COMMENT_EXPORT("??_U@YAPEAX_K@Z")                   // operator new[]
+COMMENT_EXPORT("??_V@YAXPEAX@Z")                    // operator delete[]
+#else
+COMMENT_EXPORT("??2@YAPAXI@Z")                   // operator new
+COMMENT_EXPORT("??2@YAPAXIABUnothrow_t@std@@@Z") // operator new nothrow
+COMMENT_EXPORT("??3@YAXPAX@Z")                   // operator delete
+COMMENT_EXPORT("??3@YAXPAXI@Z")                  // sized operator delete
+COMMENT_EXPORT("??_U@YAPAXI@Z")                  // operator new[]
+COMMENT_EXPORT("??_V@YAXPAX@Z")                  // operator delete[]
+#endif
+#undef COMMENT_EXPORT
+#else
 #define CXX_OPERATOR_ATTRIBUTE INTERCEPTOR_ATTRIBUTE
+#endif
 
 // Fake std::nothrow_t to avoid including <new>.
 namespace std {

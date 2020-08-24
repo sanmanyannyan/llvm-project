@@ -5,6 +5,7 @@
 // RUN:                                             not %run %t double-free 2>&1 | FileCheck --check-prefix=CHECK-double-free %s
 // RUN: %env_scudo_opts=DeallocationTypeMismatch=1  not %run %t realloc     2>&1 | FileCheck --check-prefix=CHECK-realloc %s
 // RUN: %env_scudo_opts=DeallocationTypeMismatch=0      %run %t realloc     2>&1
+// UNSUPPORTED: windows
 
 // Tests that the various aligned allocation functions work as intended. Also
 // tests for the condition where the alignment is not a power of 2.

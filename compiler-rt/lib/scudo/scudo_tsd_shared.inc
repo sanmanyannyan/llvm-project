@@ -16,7 +16,11 @@
 
 #if !SCUDO_TSD_EXCLUSIVE
 
+#if SANITIZER_WINDOWS
+extern DWORD TlsIndex;
+#elif !SANITIZER_ANDROID
 extern pthread_key_t PThreadKey;
+#endif
 
 #if SANITIZER_LINUX && !SANITIZER_ANDROID
 __attribute__((tls_model("initial-exec")))
@@ -24,7 +28,9 @@ extern THREADLOCAL ScudoTSD *CurrentTSD;
 #endif
 
 ALWAYS_INLINE ScudoTSD* getCurrentTSD() {
-#if SANITIZER_ANDROID
+#if SANITIZER_WINDOWS
+  return reinterpret_cast<ScudoTSD *>(TlsGetValue(TlsIndex));
+#elif SANITIZER_ANDROID
   return reinterpret_cast<ScudoTSD *>(*get_android_tls_ptr());
 #elif SANITIZER_LINUX
   return CurrentTSD;

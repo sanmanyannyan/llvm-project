@@ -18,7 +18,11 @@
 #include "scudo_allocator.h"
 #include "scudo_utils.h"
 
+#if !SANITIZER_WINDOWS
 #include <pthread.h>
+#else
+#include <windows.h>
+#endif // SANITIZER_WINDOWS
 
 namespace __scudo {
 

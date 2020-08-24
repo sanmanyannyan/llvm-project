@@ -1,4 +1,4 @@
-UNSUPPORTED: android
+UNSUPPORTED: android, windows
 
 Verify that various functions are *not* present in the minimal binary. Presence
 of those symbols in the minimal runtime would mean that the split code made it

@@ -1,5 +1,6 @@
 // RUN: %clang_scudo %s -o %t
 // RUN: %run %t 2>&1
+// UNSUPPORTED: windows
 
 #include <locale.h>
 #include <pthread.h>

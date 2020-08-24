@@ -21,6 +21,13 @@
 #include <psapi.h>
 #include <stdlib.h>
 
+// #define needed to link in RtlGenRandom(), a.k.a. SystemFunction036.  See the
+// "Community Additions" comment on MSDN here:
+// http://msdn.microsoft.com/en-us/library/windows/desktop/aa387694.aspx
+#define SystemFunction036 NTAPI SystemFunction036
+#include <NTSecAPI.h>
+#undef SystemFunction036
+
 #include "sanitizer_common.h"
 #include "sanitizer_file.h"
 #include "sanitizer_libc.h"
@@ -1106,9 +1113,11 @@ void CheckNoDeepBind(const char *filename, int flag) {
   // Do nothing.
 }
 
-// FIXME: implement on this platform.
+#pragma comment(lib, "advapi32.lib")
 bool GetRandom(void *buffer, uptr length, bool blocking) {
-  UNIMPLEMENTED();
+  if (!buffer || !length || length > 256)
+    return false;
+  return RtlGenRandom(buffer, length) != FALSE;
 }
 
 u32 GetNumberOfCPUs() {

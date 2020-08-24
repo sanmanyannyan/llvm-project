@@ -20,19 +20,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 
 static const size_t kNumAllocs = 64;
 static const size_t kAllocSize = 1 << 20;  // 1MB.
 
 static void *allocs[kNumAllocs];
 
+void sleep_ms(unsigned int ms) {
+#if defined(_WIN32)
+  Sleep(ms);
+#else
+  usleep(ms * 1000U);
+#endif
+}
+
 int main(int argc, char *argv[]) {
   int returned_null = 0;
   for (int i = 0; i < kNumAllocs; i++) {
     // sleep for 100ms every 8 allocations, to allow the RSS check to catch up.
     if (i != 0 && (i & 0x7) == 0)
-      usleep(100000);
+      sleep_ms(100);
     allocs[i] = malloc(kAllocSize);
     if (allocs[i])
       memset(allocs[i], 0xff, kAllocSize);  // Dirty the pages.

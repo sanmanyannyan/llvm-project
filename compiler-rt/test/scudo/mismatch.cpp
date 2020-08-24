@@ -28,4 +28,3 @@ int main(int argc, char **argv)
 }
 
 // CHECK-dealloc: ERROR: allocation type mismatch when deallocating address
-// CHECK-realloc: ERROR: allocation type mismatch when reallocating address

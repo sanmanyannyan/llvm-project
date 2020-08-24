@@ -4,7 +4,9 @@ include_directories(..)
 
 set(SCUDO_CFLAGS ${SANITIZER_COMMON_CFLAGS})
 # SANITIZER_COMMON_CFLAGS include -fno-builtin, but we actually want builtins!
-list(APPEND SCUDO_CFLAGS -fbuiltin)
+if (COMPILER_RT_HAS_FBUILTIN_FLAG)
+  list(APPEND SCUDO_CFLAGS -fbuiltin)
+endif()
 append_rtti_flag(OFF SCUDO_CFLAGS)
 
 set(SCUDO_MINIMAL_DYNAMIC_LIBS ${SANITIZER_COMMON_LINK_LIBS})
@@ -17,7 +19,9 @@ append_list_if(COMPILER_RT_HAS_OMIT_FRAME_POINTER_FLAG -fno-omit-frame-pointer
 
 set(SCUDO_DYNAMIC_LINK_FLAGS ${SANITIZER_COMMON_LINK_FLAGS})
 # Use gc-sections by default to avoid unused code being pulled in.
-list(APPEND SCUDO_DYNAMIC_LINK_FLAGS -Wl,--gc-sections)
+if (!WIN32)
+  list(APPEND SCUDO_DYNAMIC_LINK_FLAGS -Wl,--gc-sections)
+endif()
 
 if(ANDROID)
 # Put most Sanitizer shared libraries in the global group. For more details, see

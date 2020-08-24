@@ -5,7 +5,7 @@
 // RUN: env LD_PRELOAD=%shared_minlibscudo not %run %t 2>&1 | FileCheck %s
 
 // This way of setting LD_PRELOAD does not work with Android test runner.
-// REQUIRES: !android
+// UNSUPPORTED: android, windows
 
 #include <assert.h>
 

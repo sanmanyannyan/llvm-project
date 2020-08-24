@@ -16,8 +16,13 @@
 
 namespace __scudo {
 
+#if !SANITIZER_WINDOWS
 static pthread_once_t GlobalInitialized = PTHREAD_ONCE_INIT;
 pthread_key_t PThreadKey;
+#else
+DWORD TlsIndex = TLS_OUT_OF_INDEXES;
+static INIT_ONCE InitOnce = INIT_ONCE_STATIC_INIT;
+#endif
 
 static atomic_uint32_t CurrentIndex;
 static ScudoTSD *TSDs;
@@ -31,7 +36,12 @@ THREADLOCAL ScudoTSD *CurrentTSD;
 #endif
 
 static void initOnce() {
+#if SANITIZER_WINDOWS
+  TlsIndex = TlsAlloc();
+  CHECK_NE(TlsIndex, TLS_OUT_OF_INDEXES);
+#elif !SANITIZER_ANDROID
   CHECK_EQ(pthread_key_create(&PThreadKey, NULL), 0);
+#endif
   initScudo();
   NumberOfTSDs = Min(Max(1U, GetNumberOfCPUsCached()),
                      static_cast<u32>(SCUDO_SHARED_TSD_POOL_SIZE));
@@ -48,7 +58,9 @@ static void initOnce() {
 }
 
 ALWAYS_INLINE void setCurrentTSD(ScudoTSD *TSD) {
-#if SANITIZER_ANDROID
+#if SANITIZER_WINDOWS
+  CHECK(TlsSetValue(TlsIndex, reinterpret_cast<LPVOID>(TSD)));
+#elif SANITIZER_ANDROID
   *get_android_tls_ptr() = reinterpret_cast<uptr>(TSD);
 #elif SANITIZER_LINUX
   CurrentTSD = TSD;
@@ -57,8 +69,20 @@ ALWAYS_INLINE void setCurrentTSD(ScudoTSD *TSD) {
 #endif  // SANITIZER_ANDROID
 }
 
+#if SANITIZER_WINDOWS
+static BOOL CALLBACK handleInit(PINIT_ONCE InitOnce, PVOID Parameter,
+                                PVOID *Context) {
+  initOnce();
+  return TRUE;
+}
+#endif
+
 void initThread(bool MinimalInit) {
+#if SANITIZER_WINDOWS
+  CHECK(InitOnceExecuteOnce(&InitOnce, handleInit, nullptr, nullptr));
+#else
   pthread_once(&GlobalInitialized, initOnce);
+#endif
   // Initial context assignment is done in a plain round-robin fashion.
   u32 Index = atomic_fetch_add(&CurrentIndex, 1, memory_order_relaxed);
   setCurrentTSD(&TSDs[Index % NumberOfTSDs]);

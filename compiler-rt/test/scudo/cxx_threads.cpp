@@ -1,41 +1,48 @@
-// RUN: %clang_scudo %s -o %t
+// RUN: %clangxx_scudo %s -o %t
 // RUN: %env_scudo_opts="QuarantineSizeKb=0:ThreadLocalQuarantineSizeKb=0"     %run %t 5 1000000 2>&1
 // RUN: %env_scudo_opts="QuarantineSizeKb=1024:ThreadLocalQuarantineSizeKb=64" %run %t 5 1000000 2>&1
-// UNSUPPORTED: windows
 
 // Tests parallel allocations and deallocations of memory chunks from a number
 // of concurrent threads, with and without quarantine.
 // This test passes if everything executes properly without crashing.
 
 #include <assert.h>
-#include <pthread.h>
-#include <stdlib.h>
+#include <condition_variable>
 #include <stdio.h>
+#include <stdlib.h>
+#include <thread>
 
 #include <sanitizer/allocator_interface.h>
 
 int num_threads;
 int total_num_alloc;
 const int kMaxNumThreads = 500;
-pthread_t tid[kMaxNumThreads];
+std::thread thread[kMaxNumThreads];
 
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+std::condition_variable cond;
+std::mutex mutex;
 char go = 0;
 
 void *thread_fun(void *arg) {
-  pthread_mutex_lock(&mutex);
-  while (!go) pthread_cond_wait(&cond, &mutex);
-  pthread_mutex_unlock(&mutex);
+  mutex.lock();
+  while (!go) {
+    std::unique_lock<std::mutex> lk(mutex);
+    cond.wait(lk);
+  }
+
+  mutex.unlock();
   for (int i = 0; i < total_num_alloc / num_threads; i++) {
     void *p = malloc(10);
-    __asm__ __volatile__("" : : "r"(p) : "memory");
+    __asm__ __volatile__(""
+                         :
+                         : "r"(p)
+                         : "memory");
     free(p);
   }
   return 0;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   assert(argc == 3);
   num_threads = atoi(argv[1]);
   assert(num_threads > 0);
@@ -49,14 +56,14 @@ int main(int argc, char** argv) {
   fprintf(stderr, "Allocated bytes before: %zd\n",
           __sanitizer_get_current_allocated_bytes());
 
+  mutex.lock();
   for (int i = 0; i < num_threads; i++)
-    pthread_create(&tid[i], 0, thread_fun, 0);
-  pthread_mutex_lock(&mutex);
+    thread[i] = std::thread(thread_fun, (void *)0);
   go = 1;
-  pthread_cond_broadcast(&cond);
-  pthread_mutex_unlock(&mutex);
+  cond.notify_all();
+  mutex.unlock();
   for (int i = 0; i < num_threads; i++)
-    pthread_join(tid[i], 0);
+    thread[i].join();
 
   fprintf(stderr, "Heap size after: %zd\n", __sanitizer_get_heap_size());
   fprintf(stderr, "Allocated bytes after: %zd\n",
