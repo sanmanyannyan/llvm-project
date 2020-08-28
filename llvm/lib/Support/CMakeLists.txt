@@ -58,7 +58,7 @@ if(LLVM_INTEGRATED_CRT_ALLOC)
   string(REGEX REPLACE "(/|\\\\)$" "" LLVM_INTEGRATED_CRT_ALLOC "${LLVM_INTEGRATED_CRT_ALLOC}")
 
   if(NOT EXISTS "${LLVM_INTEGRATED_CRT_ALLOC}")
-    message(FATAL_ERROR "Cannot find the path to `git clone` for the CRT allocator! (${LLVM_INTEGRATED_CRT_ALLOC}). Currently, rpmalloc, snmalloc and mimalloc are supported.")
+    message(FATAL_ERROR "Cannot find the path to `git clone` for the CRT allocator! (${LLVM_INTEGRATED_CRT_ALLOC}). Currently, rpmalloc, snmalloc, mimalloc and scudo are supported.")
   endif()
 
   if(LLVM_INTEGRATED_CRT_ALLOC MATCHES "rpmalloc$")
@@ -73,6 +73,8 @@ if(LLVM_INTEGRATED_CRT_ALLOC)
 	  message(FATAL_ERROR "Cannot find the mimalloc static library. To build it, first apply the patch from https://github.com/microsoft/mimalloc/issues/268 then build the Release x64 target through ${LLVM_INTEGRATED_CRT_ALLOC}\\ide\\vs2019\\mimalloc.sln")
     endif()
     set(system_libs ${system_libs} "${MIMALLOC_LIB}" "-INCLUDE:malloc")
+  elseif(LLVM_INTEGRATED_CRT_ALLOC MATCHES "scudo")
+    set(system_libs ${system_libs} "${LLVM_INTEGRATED_CRT_ALLOC}" "-INCLUDE:malloc")
   endif()
 endif()
 
