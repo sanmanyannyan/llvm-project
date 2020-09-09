@@ -9,10 +9,10 @@ include_directories(../.. include)
 
 set(SCUDO_CFLAGS)
 
-list(APPEND SCUDO_CFLAGS
-  -Werror=conversion
-  -Wall
-  -nostdinc++)
+#list(APPEND SCUDO_CFLAGS
+#  -Werror=conversion
+#  -Wall
+#  -nostdinc++)
 
 # Remove -stdlib= which is unused when passing -nostdinc++.
 string(REGEX REPLACE "-stdlib=[a-zA-Z+]*" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
