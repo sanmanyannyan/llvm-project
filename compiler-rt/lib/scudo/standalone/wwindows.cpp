@@ -28,17 +28,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#if SCUDO_ANDROID
-#include <sys/prctl.h>
-// Definitions of prctl arguments to set a vma name in Android kernels.
-#define ANDROID_PR_SET_VMA 0x53564d41
-#define ANDROID_PR_SET_VMA_ANON_NAME 0
-#endif
-
-#ifdef ANDROID_EXPERIMENTAL_MTE
-#include <bionic/mte_kernel.h>
-#endif
-
 namespace scudo {
 
 uptr getPageSize() { return static_cast<uptr>(sysconf(_SC_PAGESIZE)); }
@@ -54,10 +43,6 @@ void *map(void *Addr, uptr Size, UNUSED const char *Name, uptr Flags,
     MmapProt = PROT_NONE;
   } else {
     MmapProt = PROT_READ | PROT_WRITE;
-#if defined(__aarch64__) && defined(ANDROID_EXPERIMENTAL_MTE)
-    if (Flags & MAP_MEMTAG)
-      MmapProt |= PROT_MTE;
-#endif
   }
   if (Addr) {
     // Currently no scenario for a noaccess mapping with a fixed address.
@@ -70,10 +55,6 @@ void *map(void *Addr, uptr Size, UNUSED const char *Name, uptr Flags,
       dieOnMapUnmapError(errno == ENOMEM);
     return nullptr;
   }
-#if SCUDO_ANDROID
-  if (!(Flags & MAP_NOACCESS))
-    prctl(ANDROID_PR_SET_VMA, ANDROID_PR_SET_VMA_ANON_NAME, P, Size, Name);
-#endif
   return P;
 }
 
@@ -140,11 +121,7 @@ u32 getNumberOfCPUs() {
 }
 
 u32 getThreadID() {
-#if SCUDO_ANDROID
-  return static_cast<u32>(gettid());
-#else
   return static_cast<u32>(syscall(SYS_gettid));
-#endif
 }
 
 // Blocking is possibly unused if the getrandom block is not compiled in.
@@ -202,12 +179,7 @@ void outputRaw(const char *Buffer) {
   }
 }
 
-extern "C" WEAK void android_set_abort_message(const char *);
-
-void setAbortMessage(const char *Message) {
-  if (&android_set_abort_message)
-    android_set_abort_message(Message);
-}
+void setAbortMessage(const char *Message) {}
 
 } // namespace scudo
 
