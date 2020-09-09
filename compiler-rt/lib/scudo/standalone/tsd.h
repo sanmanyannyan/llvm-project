@@ -14,7 +14,9 @@
 #include "mutex.h"
 
 #include <limits.h> // for PTHREAD_DESTRUCTOR_ITERATIONS
+#ifndef _WIN64
 #include <pthread.h>
+#endif
 
 // With some build setups, this might still not be defined.
 #ifndef PTHREAD_DESTRUCTOR_ITERATIONS
