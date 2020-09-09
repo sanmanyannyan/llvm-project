@@ -31,13 +31,13 @@
 #define SCUDO_FUCHSIA 0
 #endif
 
-#if defined(__WIN32__)
+#if defined(_WIN64)
 #define SCUDO_WINDOWS 1
 #else
 #define SCUDO_WINDOWS 0
 #endif
 
-#if __LP64__
+#if defined(_WIN64) or __LP64__
 #define SCUDO_WORDSIZE 64U
 #else
 #define SCUDO_WORDSIZE 32U
