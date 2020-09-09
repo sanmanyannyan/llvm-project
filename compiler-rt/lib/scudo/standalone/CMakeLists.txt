@@ -82,6 +82,7 @@ set(SCUDO_HEADERS
   vector.h
   wrappers_c_checks.h
   wrappers_c.h
+  wwindows.h
 
   include/scudo/interface.h
   )
@@ -97,6 +98,7 @@ set(SCUDO_SOURCES
   release.cpp
   report.cpp
   string_utils.cpp
+  wwindows.cpp
   )
 
 # Enable the SSE 4.2 instruction set for crc32_hw.cpp, if available.
