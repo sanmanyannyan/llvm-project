@@ -1,5 +1,7 @@
+message(INFO "*** In scudo/standalone/CMakeLists.txt ***")
 add_compiler_rt_component(scudo_standalone)
 if (COMPILER_RT_HAS_GWP_ASAN)
+    message(INFO "*** Have GWP ASAN ***")
   add_dependencies(scudo_standalone gwp_asan)
 endif()
 
@@ -125,6 +127,7 @@ if (COMPILER_RT_HAS_GWP_ASAN)
 endif()
 
 if(COMPILER_RT_HAS_SCUDO_STANDALONE)
+  message(INFO "*** COMPILER_RT_HAS_SCUDO_STANDALONE ***")
   add_compiler_rt_object_libraries(RTScudoStandalone
     ARCHS ${SCUDO_STANDALONE_SUPPORTED_ARCH}
     SOURCES ${SCUDO_SOURCES}

@@ -759,9 +759,14 @@ else()
 endif()
 
 #TODO(kostyak): add back Android & Fuchsia when the code settles a bit.
+message(INFO "*** ${SCUDO_STANDALONE_SUPPORTED_ARCH}")
+message(INFO "*** ${OS_NAME}")
+message(INFO "*** ${COMPILER_RT_HAS_AUXV}")
 if (SCUDO_STANDALONE_SUPPORTED_ARCH AND OS_NAME MATCHES "Linux|Windows")
+  message(INFO "*** Has scudo standalone")
   set(COMPILER_RT_HAS_SCUDO_STANDALONE TRUE)
 else()
+  message(INFO "*** Does not have scudo standalone")
   set(COMPILER_RT_HAS_SCUDO_STANDALONE FALSE)
 endif()
 
