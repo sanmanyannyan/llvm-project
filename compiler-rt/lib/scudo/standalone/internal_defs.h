@@ -50,7 +50,11 @@
 
 namespace scudo {
 
+#ifdef _WIN64
+typedef unsigned long long uptr;
+#else
 typedef unsigned long uptr;
+#endif
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
