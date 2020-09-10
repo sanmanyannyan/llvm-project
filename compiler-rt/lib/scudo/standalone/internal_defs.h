@@ -146,6 +146,9 @@ typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
 
+
+typedef u64 tid_t;
+
 // The following two functions have platform specific implementations.
 void outputRaw(const char *Buffer);
 void NORETURN die();

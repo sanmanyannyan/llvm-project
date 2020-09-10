@@ -28,6 +28,18 @@
 #include <time.h>
 //#include <unistd.h>
 
+#include <windows.h>
+#include <io.h>
+#include <psapi.h>
+#include <stdlib.h>
+
+// #define needed to link in RtlGenRandom(), a.k.a. SystemFunction036.  See the
+// "Community Additions" comment on MSDN here:
+// http://msdn.microsoft.com/en-us/library/windows/desktop/aa387694.aspx
+#define SystemFunction036 NTAPI SystemFunction036
+#include <NTSecAPI.h>
+#undef SystemFunction036
+
 namespace scudo {
 
 uptr getPageSize() { /*return static_cast<uptr>(sysconf(_SC_PAGESIZE)); */ }
@@ -113,44 +125,20 @@ u64 getMonotonicTime() {
 }
 
 u32 getNumberOfCPUs() {
-//  cpu_set_t CPUs;
-//  // sched_getaffinity can fail for a variety of legitimate reasons (lack of
-//  // CAP_SYS_NICE, syscall filtering, etc), in which case we shall return 0.
-//  if (sched_getaffinity(0, sizeof(cpu_set_t), &CPUs) != 0)
-//    return 0;
-//  return static_cast<u32>(CPU_COUNT(&CPUs));
-  return 0;
+  SYSTEM_INFO sysinfo = {};
+  GetNativeSystemInfo(&sysinfo);
+  return sysinfo.dwNumberOfProcessors;
 }
 
-u32 getThreadID() {
-  //return static_cast<u32>(syscall(SYS_gettid));
-  return 0;
+tid_t getThreadID() {
+  return GetCurrentThreadId();
 }
-
+#pragma comment(lib, "advapi32.lib")
 // Blocking is possibly unused if the getrandom block is not compiled in.
 bool getRandom(void *Buffer, uptr Length, UNUSED bool Blocking) {
-    return true;
-//  if (!Buffer || !Length || Length > MaxRandomLength)
-//    return false;
-//  ssize_t ReadBytes;
-//#if defined(SYS_getrandom)
-//#if !defined(GRND_NONBLOCK)
-//#define GRND_NONBLOCK 1
-//#endif
-//  // Up to 256 bytes, getrandom will not be interrupted.
-//  ReadBytes =
-//      syscall(SYS_getrandom, Buffer, Length, Blocking ? 0 : GRND_NONBLOCK);
-//  if (ReadBytes == static_cast<ssize_t>(Length))
-//    return true;
-//#endif // defined(SYS_getrandom)
-//  // Up to 256 bytes, a read off /dev/urandom will not be interrupted.
-//  // Blocking is moot here, O_NONBLOCK has no effect when opening /dev/urandom.
-//  const int FileDesc = open("/dev/urandom", O_RDONLY);
-//  if (FileDesc == -1)
-//    return false;
-//  ReadBytes = read(FileDesc, Buffer, Length);
-//  close(FileDesc);
-//  return (ReadBytes == static_cast<ssize_t>(Length));
+  if (!Buffer || !Length || Length > 256)
+    return false;
+  return RtlGenRandom(Buffer, Length) != FALSE;
 }
 
 // Allocation free syslog-like API.
