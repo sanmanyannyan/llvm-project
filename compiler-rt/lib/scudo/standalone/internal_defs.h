@@ -27,9 +27,18 @@
 #define CONCATENATE(S, C) CONCATENATE_(S, C)
 
 // Attributes & builtins related macros.
-
+#if SCUDO_WINDOWS
+#if SCUDO_IMPORT_INTERFACE
+#define INTERFACE __declspec(dllimport)
+#else
+#define INTERFACE __declspec(dllexport)
+#endif
+#else
 #define INTERFACE __attribute__((visibility("default")))
+#endif
+
 #define HIDDEN __attribute__((visibility("hidden")))
+
 #if SCUDO_WINDOWS
 #define WEAK
 #else
