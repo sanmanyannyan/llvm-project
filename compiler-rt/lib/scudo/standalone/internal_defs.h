@@ -30,7 +30,11 @@
 
 #define INTERFACE __attribute__((visibility("default")))
 #define HIDDEN __attribute__((visibility("hidden")))
+#if SCUDO_WINDOWS
+#define WEAK
+#else
 #define WEAK __attribute__((weak))
+#endif
 
 // Platform-specific defs.
 #if defined(_MSC_VER)
