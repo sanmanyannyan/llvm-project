@@ -32,7 +32,7 @@ WEAK const char *__scudo_default_options();
 WEAK void __scudo_allocate_hook(void *ptr, size_t size);
 WEAK void __scudo_deallocate_hook(void *ptr);
 
-void __scudo_print_stats(void);
+INTERFACE void __scudo_print_stats(void);
 
 typedef void (*iterate_callback)(uintptr_t base, size_t size, void *arg);
 
