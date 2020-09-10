@@ -31,10 +31,20 @@
 #define SCUDO_FUCHSIA 0
 #endif
 
-#if defined(_WIN64)
+#if defined(_WIN32)
 #define SCUDO_WINDOWS 1
 #else
 #define SCUDO_WINDOWS 0
+#endif
+
+#if defined(_WIN64)
+#define SCUDO_WINDOWS64 1
+#else
+#define SCUDO_WINDOWS64 0
+#endif
+
+#if SCUDO_WINDOWS && !SCUDO_WINDOWS64
+#error "Don't support Win32"
 #endif
 
 #if defined(_WIN64)
