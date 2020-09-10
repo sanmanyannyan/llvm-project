@@ -13,13 +13,24 @@
 #include <stdint.h>
 
 extern "C" {
+#if defined(_WIN32)
+#define SCUDO_WINDOWS 1
+#else
+#define SCUDO_WINDOWS 0
+#endif
 
-__attribute__((weak)) const char *__scudo_default_options();
+#if SCUDO_WINDOWS
+#define WEAK
+#else
+#define WEAK __attribute__((weak))
+#endif
+
+WEAK const char *__scudo_default_options();
 
 // Post-allocation & pre-deallocation hooks.
 // They must be thread-safe and not use heap related functions.
-__attribute__((weak)) void __scudo_allocate_hook(void *ptr, size_t size);
-__attribute__((weak)) void __scudo_deallocate_hook(void *ptr);
+WEAK void __scudo_allocate_hook(void *ptr, size_t size);
+WEAK void __scudo_deallocate_hook(void *ptr);
 
 void __scudo_print_stats(void);
 
