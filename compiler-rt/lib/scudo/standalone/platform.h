@@ -69,6 +69,17 @@
 #define SCUDO_MMAP_RANGE_SIZE FIRST_32_SECOND_64(1ULL << 32, 1ULL << 47)
 #endif
 
+/// \macro MSC_PREREQ
+/// \brief Is the compiler MSVC of at least the specified version?
+/// The common \param version values to check for are:
+///  * 1800: Microsoft Visual Studio 2013 / 12.0
+///  * 1900: Microsoft Visual Studio 2015 / 14.0
+#ifdef _MSC_VER
+#define MSC_PREREQ(version) (_MSC_VER >= (version))
+#else
+#define MSC_PREREQ(version) 0
+#endif
+
 // Older gcc have issues aligning to a constexpr, and require an integer.
 // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56859 among others.
 #if defined(__powerpc__) || defined(__powerpc64__)
