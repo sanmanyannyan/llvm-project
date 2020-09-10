@@ -82,6 +82,7 @@ set(SCUDO_HEADERS
   vector.h
   wrappers_c_checks.h
   wrappers_c.h
+  win_defs.h
   wwindows.h
 
   include/scudo/interface.h
