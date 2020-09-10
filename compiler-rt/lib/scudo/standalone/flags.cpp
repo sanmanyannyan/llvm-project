@@ -71,3 +71,9 @@ void initFlags() {
 }
 
 } // namespace scudo
+
+#if !SCUDO_SUPPORTS_WEAK_HOOKS
+SCUDO_INTERFACE_WEAK_DEF(const char *, __scudo_default_options, void) {
+  return "";
+}
+#endif
