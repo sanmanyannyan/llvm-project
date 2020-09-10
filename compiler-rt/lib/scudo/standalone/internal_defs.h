@@ -31,6 +31,19 @@
 #define INTERFACE __attribute__((visibility("default")))
 #define HIDDEN __attribute__((visibility("hidden")))
 #define WEAK __attribute__((weak))
+
+// Platform-specific defs.
+#if defined(_MSC_VER)
+#define ALWAYS_INLINE __forceinline
+#define ALIAS(x)
+#define FORMAT(f, a)
+#define NOINLINE __declspec(noinline)
+#define NORETURN __declspec(noreturn)
+#define THREADLOCAL __declspec(thread)
+#define LIKELY(x) (x)
+#define UNLIKELY(x) (x)
+#define PREFETCH(x) /* _mm_prefetch(x, _MM_HINT_NTA) */ (void)0
+#else // _MSC_VER
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 #define ALIAS(X) __attribute__((alias(X)))
 #define FORMAT(F, A) __attribute__((format(printf, F, A)))
@@ -44,10 +57,21 @@
 #else
 #define PREFETCH(X) __builtin_prefetch(X)
 #endif
+#endif // _MSC_VER
+
+#if !defined(_MSC_VER) || defined(__clang__)
 #define UNUSED __attribute__((unused))
 #define USED __attribute__((used))
-#define NOEXCEPT noexcept
+#else
+#define UNUSED
+#define USED
+#endif
 
+#if !defined(_MSC_VER) || defined(__clang__) || MSC_PREREQ(1900)
+#define NOEXCEPT noexcept
+#else
+#define NOEXCEPT throw()
+#endif
 namespace scudo {
 
 #if defined(_WIN64)
