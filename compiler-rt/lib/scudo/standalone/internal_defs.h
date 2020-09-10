@@ -39,6 +39,48 @@
 
 #define HIDDEN __attribute__((visibility("hidden")))
 
+//--------------------------- WEAK FUNCTIONS ---------------------------------//
+// When working with weak functions, to simplify the code and make it more
+// portable, when possible define a default implementation using this macro:
+//
+// SCUDO_INTERFACE_WEAK_DEF(<return_type>, <name>, <parameter list>)
+//
+// For example:
+//   SCUDO_INTERFACE_WEAK_DEF(bool, compare, int a, int b) { return a > b; }
+//
+#if SCUDO_WINDOWS
+#include "win_defs.h"
+#define SCUDO_INTERFACE_WEAK_DEF(ReturnType, Name, ...)                    \
+  WIN_WEAK_EXPORT_DEF(ReturnType, Name, __VA_ARGS__)
+#else
+#define SCUDO_INTERFACE_WEAK_DEF(ReturnType, Name, ...)                    \
+  extern "C" SCUDO_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE ReturnType \
+      Name(__VA_ARGS__)
+#endif
+
+// SCUDO_SUPPORTS_WEAK_HOOKS means that we support real weak functions that
+// will evaluate to a null pointer when not defined.
+#ifndef SCUDO_SUPPORTS_WEAK_HOOKS
+#if SCUDO_LINUX
+#define SCUDO_SUPPORTS_WEAK_HOOKS 1
+#else
+#define SCUDO_SUPPORTS_WEAK_HOOKS 0
+#endif
+#endif // SCUDO_SUPPORTS_WEAK_HOOKS
+// For some weak hooks that will be called very often and we want to avoid the
+// overhead of executing the default implementation when it is not necessary,
+// we can use the flag SANITIZER_SUPPORTS_WEAK_HOOKS to only define the default
+// implementation for platforms that doesn't support weak symbols. For example:
+//
+//   #if !SANITIZER_SUPPORT_WEAK_HOOKS
+//     SANITIZER_INTERFACE_WEAK_DEF(bool, compare_hook, int a, int b) {
+//       return a > b;
+//     }
+//   #endif
+//
+// And then use it as: if (compare_hook) compare_hook(a, b);
+//----------------------------------------------------------------------------//
+
 #if SCUDO_WINDOWS
 #define WEAK
 #else
