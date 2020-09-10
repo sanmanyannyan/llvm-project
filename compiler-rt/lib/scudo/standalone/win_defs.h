@@ -12,7 +12,7 @@
 #ifndef SANITIZER_WIN_DEFS_H
 #define SANITIZER_WIN_DEFS_H
 
-#include "sanitizer_platform.h"
+#include "platform.h"
 #if SANITIZER_WINDOWS
 
 #ifndef WINAPI
