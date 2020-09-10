@@ -51,9 +51,33 @@ template <class T> void Swap(T &A, T &B) {
 
 inline bool isPowerOfTwo(uptr X) { return (X & (X - 1)) == 0; }
 
+// Math
+#if SCUDO_WINDOWS && !defined(__clang__) && !defined(__GNUC__)
+extern "C" {
+unsigned char _BitScanForward(unsigned long *index, unsigned long mask);
+unsigned char _BitScanReverse(unsigned long *index, unsigned long mask);
+#if defined(_WIN64)
+unsigned char _BitScanForward64(unsigned long *index, unsigned __int64 mask);
+unsigned char _BitScanReverse64(unsigned long *index, unsigned __int64 mask);
+#endif
+}
+#endif
+
 inline uptr getMostSignificantSetBitIndex(uptr X) {
   DCHECK_NE(X, 0U);
-  return SCUDO_WORDSIZE - 1U - static_cast<uptr>(__builtin_clzl(X));
+  unsigned long up;
+#if !SCUDO_WINDOWS || defined(__clang__) || defined(__GNUC__)
+#ifdef _WIN64
+  up = SCUDO_WORDSIZE - 1 - __builtin_clzll(X);
+#else
+  up = SCUDO_WORDSIZE - 1 - __builtin_clzl(X);
+#endif
+#elif defined(_WIN64)
+  _BitScanReverse64(&up, X);
+#else
+  _BitScanReverse(&up, X);
+#endif
+  return up;
 }
 
 inline uptr roundUpToPowerOfTwo(uptr Size) {
@@ -68,7 +92,19 @@ inline uptr roundUpToPowerOfTwo(uptr Size) {
 
 inline uptr getLeastSignificantSetBitIndex(uptr X) {
   DCHECK_NE(X, 0U);
-  return static_cast<uptr>(__builtin_ctzl(X));
+  unsigned long up;
+#if !SCUDO_WINDOWS || defined(__clang__) || defined(__GNUC__)
+#ifdef _WIN64
+  up = __builtin_ctzll(X);
+#else
+  up = __builtin_ctzl(X);
+#endif
+#elif defined(_WIN64)
+  _BitScanForward64(&up, X);
+#else
+  _BitScanForward(&up, X);
+#endif
+  return up;
 }
 
 inline uptr getLog2(uptr X) {
