@@ -1,4 +1,4 @@
-//===-- wwindows.h ----------------------------------------------*- C++ -*-===//
+//===-- win.h ----------------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SCUDO_WWINDOWS_H_
-#define SCUDO_WWINDOWS_H_
+#ifndef SCUDO_WIN_H_
+#define SCUDO_WIN_H_
 
 #include "platform.h"
 
@@ -22,4 +22,4 @@ struct MapPlatformData {};
 
 #endif // SCUDO_WINDOWS
 
-#endif // SCUDO_WWINDOWS_H_
+#endif // SCUDO_WIN_H_

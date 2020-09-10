@@ -1,4 +1,4 @@
-//===-- wwindows.cpp --------------------------------------------*- C++ -*-===//
+//===-- win.cpp --------------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,7 +11,7 @@
 #if SCUDO_WINDOWS
 
 #include "common.h"
-#include "wwindows.h"
+#include "win.h"
 #include "mutex.h"
 #include "string_utils.h"
 
