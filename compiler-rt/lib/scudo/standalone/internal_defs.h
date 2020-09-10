@@ -50,12 +50,18 @@
 
 namespace scudo {
 
-typedef uintptr_t uptr;
+#if defined(_WIN64)
+// 64-bit Windows uses LLP64 data model.
+typedef unsigned long long uptr;
+typedef signed long long sptr;
+#else
+typedef unsigned long uptr;
+typedef signed long sptr;
+#endif  // defined(_WIN64)
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
-typedef intptr_t sptr;
 typedef int8_t s8;
 typedef int16_t s16;
 typedef int32_t s32;
