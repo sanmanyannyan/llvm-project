@@ -42,7 +42,11 @@
 
 namespace scudo {
 
-uptr getPageSize() { /*return static_cast<uptr>(sysconf(_SC_PAGESIZE)); */ }
+uptr getPageSize() {
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwPageSize;
+}
 
 void NORETURN die() { abort(); }
 
