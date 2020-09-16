@@ -14,6 +14,7 @@
 #include "win.h"
 #include "mutex.h"
 #include "string_utils.h"
+#include "atomic_helpers.h"
 
 #include <errno.h>
 #include <fcntl.h>
