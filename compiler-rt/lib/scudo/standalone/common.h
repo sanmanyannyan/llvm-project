@@ -91,7 +91,7 @@ inline uptr roundUpToPowerOfTwo(uptr Size) {
   const uptr Up = getMostSignificantSetBitIndex(Size);
   DCHECK_LT(Size, (1UL << (Up + 1)));
   DCHECK_GT(Size, (1UL << Up));
-  return 1UL << (Up + 1);
+  return 1ULL << (Up + 1);
 }
 
 inline uptr getLeastSignificantSetBitIndex(uptr X) {
