@@ -1,4 +1,4 @@
-//===-- sanitizer_win_defs.h ------------------------------------*- C++ -*-===//
+//===-- win_defs.h ------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -42,8 +42,6 @@
 // Intermediate macro to ensure the parameter is expanded before stringified.
 #define STRINGIFY_(A) #A
 #define STRINGIFY(A) STRINGIFY_(A)
-
-#if !SANITIZER_GO
 
 // ----------------- A workaround for the absence of weak symbols --------------
 // We don't have a direct equivalent of weak symbols when using MSVC, but we can
@@ -160,15 +158,6 @@
 //     return a >= b;
 //   }
 //
-
-#else // SANITIZER_GO
-
-// Go neither needs nor wants weak references.
-// The shenanigans above don't work for gcc.
-# define WIN_WEAK_EXPORT_DEF(ReturnType, Name, ...)                            \
-  extern "C" ReturnType Name(__VA_ARGS__)
-
-#endif // SANITIZER_GO
 
 #endif // SCUDO_WINDOWS
 #endif // SCUDO_WIN_DEFS_H
