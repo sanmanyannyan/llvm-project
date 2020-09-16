@@ -16,6 +16,8 @@
 #include "string_utils.h"
 #include "atomic_helpers.h"
 
+#include <chrono>
+
 #include <errno.h>
 #include <fcntl.h>
 //#include <linux/futex.h>
@@ -123,10 +125,8 @@ void HybridMutex::unlock() {
 }
 
 u64 getMonotonicTime() {
-//  timespec TS;
-//  clock_gettime(CLOCK_MONOTONIC, &TS);
-//  return static_cast<u64>(TS.tv_sec) * (1000ULL * 1000 * 1000) +
-//         static_cast<u64>(TS.tv_nsec);
+  auto now = std::chrono::steady_clock::now();
+  return std::chrono::time_point_cast<std::chrono::nanoseconds>(now).time_since_epoch().count();
 }
 
 u32 getNumberOfCPUs() {
