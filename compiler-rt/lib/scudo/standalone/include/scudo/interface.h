@@ -12,20 +12,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "internal_defs.h"
+
 extern "C" {
-#if defined(_WIN32)
-#define SCUDO_WINDOWS 1
-#else
-#define SCUDO_WINDOWS 0
-#endif
-
-#if SCUDO_WINDOWS
-#define WEAK
-#else
-#define WEAK __attribute__((weak))
-#endif
-
-WEAK const char *__scudo_default_options();
+INTERFACE WEAK const char *__scudo_default_options();
 
 // Post-allocation & pre-deallocation hooks.
 // They must be thread-safe and not use heap related functions.
