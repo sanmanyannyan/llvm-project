@@ -114,7 +114,31 @@ struct atomic_uptr {
 //}
 //
 //inline void atomic_thread_fence(memory_order) { __sync_synchronize(); }
-//
+
+
+INLINE u32 atomic_fetch_add(volatile atomic_u32 *a, u32 v,
+                            memory_order mo) {
+  (void)mo;
+  DCHECK(!((uptr)a % sizeof(*a)));
+  return (u32)_InterlockedExchangeAdd((volatile long *)&a->ValDoNotUse,
+                                      (long)v);
+}
+
+INLINE uptr atomic_fetch_add(volatile atomic_uptr *a, uptr v,
+                             memory_order mo) {
+  (void)mo;
+  DCHECK(!((uptr)a % sizeof(*a)));
+#ifdef _WIN64
+  return (uptr)_InterlockedExchangeAdd64((volatile long long *)&a->ValDoNotUse,
+                                         (long long)v);
+#else
+  return (uptr)_InterlockedExchangeAdd((volatile long *)&a->ValDoNotUse,
+                                       (long)v);
+#endif
+}
+
+
+
 //template <typename T>
 //inline typename T::Type atomic_fetch_add(volatile T *A, typename T::Type V,
 //                                         memory_order MO) {
@@ -152,13 +176,13 @@ struct atomic_uptr {
 //  return R;
 //}
 //
-//template <typename T>
-//inline bool atomic_compare_exchange_strong(volatile T *A, typename T::Type *Cmp,
-//                                           typename T::Type Xchg,
-//                                           memory_order MO) {
-//  return __atomic_compare_exchange(&A->ValDoNotUse, Cmp, &Xchg, false, MO,
-//                                   __ATOMIC_RELAXED);
-//}
+template <typename T>
+inline bool atomic_compare_exchange_strong(volatile T *A, typename T::Type *Cmp,
+                                           typename T::Type Xchg,
+                                           memory_order MO) {
+  return __atomic_compare_exchange(&A->ValDoNotUse, Cmp, &Xchg, false, MO,
+                                   __ATOMIC_RELAXED);
+}
 
 INLINE bool atomic_compare_exchange_strong(volatile atomic_u8 *a, u8 *cmp,
                                            u8 xchgv, memory_order mo) {
@@ -234,13 +258,13 @@ INLINE bool atomic_compare_exchange_strong(volatile atomic_u64 *a,
 
 
 
-//template <typename T>
-//inline bool atomic_compare_exchange_weak(volatile T *A, typename T::Type *Cmp,
-//                                         typename T::Type Xchg,
-//                                         memory_order MO) {
-//  return __atomic_compare_exchange(&A->ValDoNotUse, Cmp, &Xchg, true, MO,
-//                                   __ATOMIC_RELAXED);
-//}
+template <typename T>
+inline bool atomic_compare_exchange_weak(volatile T *A, typename T::Type *Cmp,
+                                         typename T::Type Xchg,
+                                         memory_order MO) {
+  return __atomic_compare_exchange(&A->ValDoNotUse, Cmp, &Xchg, true, MO,
+                                   __ATOMIC_RELAXED);
+}
 
 // Clutter-reducing helpers.
 
