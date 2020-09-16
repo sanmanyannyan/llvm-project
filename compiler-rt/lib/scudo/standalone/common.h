@@ -18,6 +18,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef SCUDO_WINDOWS
+extern "C" void _mm_pause();
+#pragma intrinsic(_mm_pause)
+#endif
 namespace scudo {
 
 template <class Dest, class Source> inline Dest bit_cast(const Source &S) {
@@ -138,6 +142,10 @@ template <typename T> inline void shuffle(T *A, u32 N, u32 *RandState) {
 // Hardware specific inlinable functions.
 
 inline void yieldProcessor(u8 Count) {
+#if SCUDO_WINDOWS
+  for (int i = 0; i < Count; i++)
+    _mm_pause();
+#else
 #if defined(__i386__) || defined(__x86_64__)
   __asm__ __volatile__("" ::: "memory");
   for (u8 I = 0; I < Count; I++)
@@ -148,6 +156,7 @@ inline void yieldProcessor(u8 Count) {
     __asm__ __volatile__("yield");
 #endif
   __asm__ __volatile__("" ::: "memory");
+#endif // SCUDO_WINDOWS
 }
 
 // Platform specific functions.
