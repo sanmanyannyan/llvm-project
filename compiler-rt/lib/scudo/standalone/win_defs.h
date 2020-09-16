@@ -9,11 +9,11 @@
 // Common definitions for Windows-specific code.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SANITIZER_WIN_DEFS_H
-#define SANITIZER_WIN_DEFS_H
+#ifndef SCUDO_WIN_DEFS_H
+#define SCUDO_WIN_DEFS_H
 
 #include "platform.h"
-#if SANITIZER_WINDOWS
+#if SCUDO_WINDOWS
 
 #ifndef WINAPI
 #if defined(_M_IX86) || defined(__i386__)
@@ -170,5 +170,5 @@
 
 #endif // SANITIZER_GO
 
-#endif // SANITIZER_WINDOWS
-#endif // SANITIZER_WIN_DEFS_H
+#endif // SCUDO_WINDOWS
+#endif // SCUDO_WIN_DEFS_H
