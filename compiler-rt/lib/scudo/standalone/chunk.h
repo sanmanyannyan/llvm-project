@@ -63,13 +63,14 @@ enum State : u8 { Available = 0, Allocated = 1, Quarantined = 2 };
 typedef u64 PackedHeader;
 // Update the 'Mask' constants to reflect changes in this structure.
 struct UnpackedHeader {
-  uptr ClassId : 8;
-  u8 State : 2;
+  u64 ClassId : 8;
+  u64 State : 2;
   // Origin if State == Allocated, or WasZeroed otherwise.
-  u8 OriginOrWasZeroed : 2;
-  uptr SizeOrUnusedBytes : 20;
-  uptr Offset : 16;
-  uptr Checksum : 16;
+  u64 OriginOrWasZeroed : 2;
+  u64 Origin : 2;
+  u64 SizeOrUnusedBytes : 20;
+  u64 Offset : 16;
+  u64 Checksum : 16;
 };
 typedef atomic_u64 AtomicPackedHeader;
 static_assert(sizeof(UnpackedHeader) == sizeof(PackedHeader), "");
