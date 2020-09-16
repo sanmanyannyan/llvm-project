@@ -33,8 +33,14 @@ public:
 private:
   ScopedString Message;
 };
+#if !defined(_MSC_VER) || defined(__clang__)
+INLINE void NORETURN trap() { __builtin_trap(); }
+#else
+extern "C" void __ud2(void);
+#pragma intrinsic(__ud2)
+INLINE void trap() { __ud2(); }
+#endif
 
-inline void NORETURN trap() { __builtin_trap(); }
 
 // This could potentially be called recursively if a CHECK fails in the reports.
 void NORETURN reportCheckFailed(const char *File, int Line,
