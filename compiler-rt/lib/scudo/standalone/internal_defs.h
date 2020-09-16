@@ -87,6 +87,11 @@
 #define WEAK __attribute__((weak))
 #endif
 
+// Common defs
+#ifndef INLINE
+#define INLINE inline
+#endif
+
 // Platform-specific defs.
 #if defined(_MSC_VER)
 #define ALWAYS_INLINE __forceinline
