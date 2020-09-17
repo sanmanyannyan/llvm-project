@@ -11,6 +11,7 @@
 
 #include "tsd.h"
 
+#if SCUDO_TSD_EXCLUSIVE
 namespace scudo {
 
 struct ThreadState {
@@ -137,5 +138,5 @@ template <class Allocator> void teardownThread(void *Ptr) {
 }
 
 } // namespace scudo
-
+#endif // SCUDO_TSD_EXCLUSIVE
 #endif // SCUDO_TSD_EXCLUSIVE_H_
