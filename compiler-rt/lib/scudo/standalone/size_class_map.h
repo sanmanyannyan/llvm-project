@@ -17,7 +17,7 @@ namespace scudo {
 
 inline uptr scaledLog2(uptr Size, uptr ZeroLog, uptr LogBits) {
   const uptr L = getMostSignificantSetBitIndex(Size);
-  const uptr LBits = (Size >> (L - LogBits)) - (1 << LogBits);
+  const uptr LBits = (Size >> (L - LogBits)) - (1ULL << LogBits);
   const uptr HBits = (L - ZeroLog) << LogBits;
   return LBits + HBits;
 }
