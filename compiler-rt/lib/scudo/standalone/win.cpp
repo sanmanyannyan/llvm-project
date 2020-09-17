@@ -125,8 +125,23 @@ void HybridMutex::unlock() {
 }
 
 u64 getMonotonicTime() {
-  auto now = std::chrono::steady_clock::now();
-  return std::chrono::time_point_cast<std::chrono::nanoseconds>(now).time_since_epoch().count();
+  static LARGE_INTEGER frequency = {};
+  LARGE_INTEGER counter;
+  if (UNLIKELY(frequency.QuadPart == 0)) {
+    QueryPerformanceFrequency(&frequency);
+    CHECK_NE(frequency.QuadPart, 0);
+  }
+  QueryPerformanceCounter(&counter);
+  counter.QuadPart *= 1000ULL * 1000000ULL;
+  counter.QuadPart /= frequency.QuadPart;
+  return counter.QuadPart;
+
+  // Would like to use this but it seems slower on Windows
+  //using namespace std::chrono;
+  //return time_point_cast<nanoseconds>(
+  //           steady_clock::now())
+  //    .time_since_epoch()
+  //    .count();
 }
 
 u32 getNumberOfCPUs() {
