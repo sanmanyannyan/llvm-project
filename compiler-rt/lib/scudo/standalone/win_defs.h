@@ -15,13 +15,13 @@
 #include "platform.h"
 #if SCUDO_WINDOWS
 
-#ifndef WINAPI
-#if defined(_M_IX86) || defined(__i386__)
-#define WINAPI __stdcall
-#else
-#define WINAPI
-#endif
-#endif
+//#ifndef WINAPI
+//#if defined(_M_IX86) || defined(__i386__)
+//#define WINAPI __stdcall
+//#else
+//#define WINAPI
+//#endif
+//#endif
 
 #if defined(_M_IX86) || defined(__i386__)
 #define WIN_SYM_PREFIX "_"
