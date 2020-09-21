@@ -11,7 +11,6 @@
 
 #include "tsd.h"
 
-#if SCUDO_TSD_EXCLUSIVE
 namespace scudo {
 
 struct ThreadState {
@@ -102,7 +101,11 @@ private:
     Instance->callPostInitCallback();
   }
 
+#if !SCUDO_WINDOWS
   pthread_key_t PThreadKey;
+#else
+
+#endif
   bool Initialized;
   atomic_u8 Disabled;
   TSD<Allocator> FallbackTSD;
@@ -138,5 +141,4 @@ template <class Allocator> void teardownThread(void *Ptr) {
 }
 
 } // namespace scudo
-#endif // SCUDO_TSD_EXCLUSIVE
 #endif // SCUDO_TSD_EXCLUSIVE_H_
