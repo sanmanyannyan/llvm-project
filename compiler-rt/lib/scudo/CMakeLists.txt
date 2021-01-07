@@ -19,7 +19,7 @@ append_list_if(COMPILER_RT_HAS_OMIT_FRAME_POINTER_FLAG -fno-omit-frame-pointer
 
 set(SCUDO_DYNAMIC_LINK_FLAGS ${SANITIZER_COMMON_LINK_FLAGS})
 # Use gc-sections by default to avoid unused code being pulled in.
-if (!WIN32)
+if (COMPILER_RT_HAS_GC_SECTIONS)
   list(APPEND SCUDO_DYNAMIC_LINK_FLAGS -Wl,--gc-sections)
 endif()
 

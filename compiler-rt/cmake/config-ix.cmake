@@ -178,6 +178,8 @@ if(ANDROID)
   check_library_exists(log __android_log_write "" COMPILER_RT_HAS_LIBLOG)
 endif()
 
+check_linker_flag("-Wl,--gc-sections" COMPILER_RT_HAS_GC_SECTIONS)
+
 # Architectures.
 
 # List of all architectures we can target.
