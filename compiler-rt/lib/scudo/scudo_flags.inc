@@ -46,3 +46,6 @@ SCUDO_FLAG(bool, DeleteSizeMismatch, true,
 
 SCUDO_FLAG(bool, ZeroContents, false,
           "Zero chunk contents on allocation and deallocation.")
+
+SCUDO_FLAG(bool, PrintOnAllocation, false,
+          "Print out pointer and size when allocating")

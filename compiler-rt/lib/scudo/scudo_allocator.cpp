@@ -34,6 +34,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <cstdio>
 
 namespace __scudo {
 
@@ -707,7 +708,11 @@ void *scudoAllocate(uptr Size, uptr Alignment, AllocType Type) {
       return nullptr;
     reportAllocationAlignmentNotPowerOfTwo(Alignment);
   }
-  return SetErrnoOnNull(Instance.allocate(Size, Alignment, Type));
+  void * mem = SetErrnoOnNull(Instance.allocate(Size, Alignment, Type));
+  if (getFlags()->PrintOnAllocation) {
+    printf("Allocating memory at %p, size %d\n", mem, Size);
+  }
+  return mem;
 }
 
 void scudoDeallocate(void *Ptr, uptr Size, uptr Alignment, AllocType Type) {
