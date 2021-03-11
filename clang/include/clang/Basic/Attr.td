@@ -3173,22 +3173,23 @@ def LoopHint : Attr {
 
   let Spellings = [Pragma<"clang", "loop">, Pragma<"", "unroll">,
                    Pragma<"", "nounroll">, Pragma<"", "unroll_and_jam">,
-                   Pragma<"", "nounroll_and_jam">];
+                   Pragma<"", "nounroll_and_jam">, Pragma<"", "temporal_blocking">];
 
   /// State of the loop optimization specified by the spelling.
   let Args = [EnumArgument<"Option", "OptionType",
                           ["vectorize", "vectorize_width", "interleave", "interleave_count",
                            "unroll", "unroll_count", "unroll_and_jam", "unroll_and_jam_count",
                            "pipeline", "pipeline_initiation_interval", "distribute",
-                           "vectorize_predicate"],
+                           "vectorize_predicate", "temporal_blocking", "scheme", "tile_size", "radius"],
                           ["Vectorize", "VectorizeWidth", "Interleave", "InterleaveCount",
                            "Unroll", "UnrollCount", "UnrollAndJam", "UnrollAndJamCount",
                            "PipelineDisabled", "PipelineInitiationInterval", "Distribute",
-                           "VectorizePredicate"]>,
-              EnumArgument<"State", "LoopHintState",
-                           ["enable", "disable", "numeric", "assume_safety", "full"],
-                           ["Enable", "Disable", "Numeric", "AssumeSafety", "Full"]>,
-              ExprArgument<"Value">];
+                           "VectorizePredicate", "TemporalBlocking", "Scheme", "TileSize", "Radius"]>,
+              VariadicEnumArgument<"States", "LoopHintState",
+                           ["enable", "disable", "numerics", "assume_safety", "full", "wavefront", "diamond", "trapezoid"],
+                           ["Enable", "Disable", "Numerics", "AssumeSafety", "Full", "Wavefront", "Diamond", "Trapezoid"]>,
+              VariadicExprArgument<"Values">,
+              VariadicExprArgument<"Radiuses">];
 
   let AdditionalMembers = [{
   static const char *getOptionName(int Option) {
@@ -3205,6 +3206,10 @@ def LoopHint : Attr {
     case PipelineInitiationInterval: return "pipeline_initiation_interval";
     case Distribute: return "distribute";
     case VectorizePredicate: return "vectorize_predicate";
+    case TemporalBlocking: return "temporal_blocking";
+    case Scheme: return "scheme";
+    case TileSize: return "tile_size";
+    case Radius: return "radius";
     }
     llvm_unreachable("Unhandled LoopHint option.");
   }
@@ -3213,7 +3218,7 @@ def LoopHint : Attr {
 
   // Return a string containing the loop hint argument including the
   // enclosing parentheses.
-  std::string getValueString(const PrintingPolicy &Policy) const;
+  std::string getValuesString(const PrintingPolicy &Policy) const;
 
   // Return a string suitable for identifying this attribute in diagnostics.
   std::string getDiagnosticName(const PrintingPolicy &Policy) const;

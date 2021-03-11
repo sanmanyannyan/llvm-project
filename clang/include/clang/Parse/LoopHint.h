@@ -34,6 +34,10 @@ struct LoopHint {
   // Expression for the hint argument if it exists, null otherwise.
   Expr *ValueExpr;
 
+  SmallVector<Expr *, 1> TileSizes;
+  SmallVector<Expr *, 1> Radiuses;
+  SmallVector<IdentifierLoc *, 1> Schemes;
+
   LoopHint()
       : PragmaNameLoc(nullptr), OptionLoc(nullptr), StateLoc(nullptr),
         ValueExpr(nullptr) {}

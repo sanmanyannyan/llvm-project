@@ -43,6 +43,9 @@ struct LoopAttributes {
   /// State of loop vectorization or unrolling.
   enum LVEnableState { Unspecified, Enable, Disable, Full };
 
+  /// State of temporal blocking loop shape
+  enum TemporalBlockingScheme { Trapezoid, Diamond, Wavefront };
+
   /// Value for llvm.loop.vectorize.enable metadata.
   LVEnableState VectorizeEnable;
 
@@ -75,6 +78,11 @@ struct LoopAttributes {
 
   /// Value for llvm.loop.pipeline.iicount metadata.
   unsigned PipelineInitiationInterval;
+
+  bool TemporalBlockingEnabled;
+  llvm::SmallVector<TemporalBlockingScheme, 1> LoopSchemes;
+  llvm::SmallVector<unsigned, 1> TileSizes;
+  llvm::SmallVector<unsigned, 1> Radiuses;
 };
 
 /// Information used when generating a structured loop.
@@ -164,6 +172,10 @@ private:
                                bool &HasUserTransforms);
   llvm::MDNode *
   createFullUnrollMetadata(const LoopAttributes &Attrs,
+                           llvm::ArrayRef<llvm::Metadata *> LoopProperties,
+                           bool &HasUserTransforms);
+  llvm::MDNode *
+  createTemporalBlockingMetadata(const LoopAttributes &Attrs,
                            llvm::ArrayRef<llvm::Metadata *> LoopProperties,
                            bool &HasUserTransforms);
   /// @}
@@ -270,6 +282,22 @@ public:
   /// Set the pipeline initiation interval.
   void setPipelineInitiationInterval(unsigned C) {
     StagedAttrs.PipelineInitiationInterval = C;
+  }
+
+  void setTileSizes(llvm::SmallVector<unsigned, 1> &src) {
+    std::copy(src.begin(), src.end(),
+              std::back_inserter(StagedAttrs.TileSizes));
+  }
+  void setRadiuses(llvm::SmallVector<unsigned, 1> &src) {
+    std::copy(src.begin(), src.end(), std::back_inserter(StagedAttrs.Radiuses));
+  }
+  void setSchemes(
+      llvm::SmallVector<LoopAttributes::TemporalBlockingScheme, 1> &src) {
+    std::copy(src.begin(), src.end(),
+              std::back_inserter(StagedAttrs.LoopSchemes));
+  }
+  void setTemporalBlockingEnabled() {
+    StagedAttrs.TemporalBlockingEnabled = true;
   }
 
 private:

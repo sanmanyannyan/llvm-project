@@ -403,6 +403,95 @@ MDNode *LoopInfo::createFullUnrollMetadata(const LoopAttributes &Attrs,
   return LoopID;
 }
 
+MDNode *LoopInfo::createTemporalBlockingMetadata(const LoopAttributes &Attrs,
+                                                 ArrayRef<Metadata *> LoopProperties,
+                                                 bool &HasUserTransforms) {
+  LLVMContext &Ctx = Header->getContext();
+
+  Optional<bool> Enabled;
+  if (Attrs.TemporalBlockingEnabled == LoopAttributes::Enable) {
+    Enabled = true;
+  }
+
+  if (Enabled != true) {
+    return createFullUnrollMetadata(Attrs, LoopProperties,
+                                        HasUserTransforms);
+  }
+
+  SmallVector<Metadata *, 4> Args;
+  TempMDTuple TempNode = MDNode::getTemporary(Ctx, None);
+  //Args.push_back(TempNode.get());
+  //Args.append(LoopProperties.begin(), LoopProperties.end());
+  //Args.push_back(MDNode::get(Ctx, MDString::get(Ctx, "llvm.loop.unroll.full")));
+
+  // Setting temporalblocking.schemes
+  if (Attrs.LoopSchemes.size() > 0) {
+    Metadata **Vals = new Metadata *[Attrs.LoopSchemes.size() + 1];
+    Vals[0] = MDString::get(Ctx, "llvm.loop.temporalblocking.schemes");
+    for (unsigned i = 0u; i < Attrs.LoopSchemes.size(); ++i) {
+      std::string scheme = "default";
+      if (Attrs.LoopSchemes[i] == LoopAttributes::Diamond) {
+        scheme = "diamond";
+      } else if (Attrs.LoopSchemes[i] == LoopAttributes::Wavefront) {
+        scheme = "wavefront";
+      } else if (Attrs.LoopSchemes[i] == LoopAttributes::Trapezoid) {
+        scheme = "trapezoid";
+      } 
+      Vals[i + 1u] = MDString::get(Ctx, scheme);
+    }
+    Args.push_back(MDNode::get(
+        Ctx, llvm::ArrayRef<Metadata *>(Vals, Attrs.LoopSchemes.size() + 1)));
+    delete[] Vals;
+  }
+
+  // Setting temporalblocking.tilesizes
+  if (Attrs.TileSizes.size() > 0) {
+    Metadata **Vals = new Metadata *[Attrs.TileSizes.size() + 1];
+    Vals[0] = MDString::get(Ctx, "llvm.loop.temporalblocking.tilesizes");
+    for (unsigned i = 0u; i < Attrs.TileSizes.size(); ++i) {
+      //Vals[i + 1u] = ConstantAsMetadata::get(
+      //    ConstantInt::get(Type::getInt32Ty(Ctx), Attrs.TileSizes[i]));
+       Vals[i + 1u] = ConstantAsMetadata::get(
+          ConstantInt::get(llvm::Type::getInt32Ty(Ctx), Attrs.TileSizes[i]));
+    }
+    Args.push_back(MDNode::get(
+        Ctx, llvm::ArrayRef<Metadata *>(Vals, Attrs.TileSizes.size() + 1)));
+    delete[] Vals;
+  }
+
+  // Setting temporalblocking.radiuses
+  if (Attrs.Radiuses.size() > 0) {
+    Metadata **Vals = new Metadata *[Attrs.Radiuses.size() + 1];
+    Vals[0] = MDString::get(Ctx, "llvm.loop.temporalblocking.radiuses");
+    for (unsigned i = 0u; i < Attrs.Radiuses.size(); ++i) {
+      Vals[i + 1u] = ConstantAsMetadata::get(
+          ConstantInt::get(llvm::Type::getInt32Ty(Ctx), Attrs.Radiuses[i]));
+    }
+    Args.push_back(MDNode::get(
+        Ctx, llvm::ArrayRef<Metadata *>(Vals, Attrs.Radiuses.size() + 1)));
+    delete[] Vals;
+  }
+
+  // Setting temporalblocking.enable
+  if (Attrs.TemporalBlockingEnabled) {
+    Metadata *Vals[] = {
+        MDString::get(Ctx, "llvm.loop.temporalblocking.enable"),
+                        ConstantAsMetadata::get(ConstantInt::get(
+                            llvm::Type::getInt1Ty(Ctx), true))};
+    Args.push_back(MDNode::get(Ctx, Vals));
+  }
+
+
+  // No follow-up: there is no loop after full unrolling.
+  // TODO: Warn if there are transformations after full unrolling.
+
+  MDNode *LoopID = MDNode::getDistinct(Ctx, Args);
+  LoopID->replaceOperandWith(0, LoopID);
+  HasUserTransforms = true;
+  return LoopID;
+}
+
+
 MDNode *LoopInfo::createMetadata(
     const LoopAttributes &Attrs,
     llvm::ArrayRef<llvm::Metadata *> AdditionalLoopProperties,
@@ -428,7 +517,8 @@ MDNode *LoopInfo::createMetadata(
 
   LoopProperties.insert(LoopProperties.end(), AdditionalLoopProperties.begin(),
                         AdditionalLoopProperties.end());
-  return createFullUnrollMetadata(Attrs, LoopProperties, HasUserTransforms);
+  return createTemporalBlockingMetadata(Attrs, LoopProperties,
+                                        HasUserTransforms);
 }
 
 LoopAttributes::LoopAttributes(bool IsParallel)
@@ -438,7 +528,10 @@ LoopAttributes::LoopAttributes(bool IsParallel)
       VectorizePredicateEnable(LoopAttributes::Unspecified), VectorizeWidth(0),
       InterleaveCount(0), UnrollCount(0), UnrollAndJamCount(0),
       DistributeEnable(LoopAttributes::Unspecified), PipelineDisabled(false),
-      PipelineInitiationInterval(0) {}
+      PipelineInitiationInterval(0), TemporalBlockingEnabled(false),
+      LoopSchemes(SmallVector<LoopAttributes::TemporalBlockingScheme, 1>()),
+      TileSizes(SmallVector<unsigned, 1>()),
+      Radiuses(SmallVector<unsigned, 1>()) {}
 
 void LoopAttributes::clear() {
   IsParallel = false;
@@ -453,6 +546,10 @@ void LoopAttributes::clear() {
   DistributeEnable = LoopAttributes::Unspecified;
   PipelineDisabled = false;
   PipelineInitiationInterval = 0;
+  TemporalBlockingEnabled = false;
+  LoopSchemes.clear();
+  TileSizes.clear();
+  Radiuses.clear();
 }
 
 LoopInfo::LoopInfo(BasicBlock *Header, const LoopAttributes &Attrs,
@@ -475,7 +572,10 @@ LoopInfo::LoopInfo(BasicBlock *Header, const LoopAttributes &Attrs,
       Attrs.VectorizeEnable == LoopAttributes::Unspecified &&
       Attrs.UnrollEnable == LoopAttributes::Unspecified &&
       Attrs.UnrollAndJamEnable == LoopAttributes::Unspecified &&
-      Attrs.DistributeEnable == LoopAttributes::Unspecified && !StartLoc &&
+      Attrs.DistributeEnable == LoopAttributes::Unspecified &&
+      Attrs.TileSizes.empty() && Attrs.LoopSchemes.empty() &&
+      Attrs.Radiuses.empty() && !Attrs.TemporalBlockingEnabled &&
+      !StartLoc &&
       !EndLoc)
     return;
 
@@ -591,8 +691,11 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
     }
 
     LoopHintAttr::OptionType Option = LoopHintAttr::Unroll;
-    LoopHintAttr::LoopHintState State = LoopHintAttr::Disable;
-    unsigned ValueInt = 1;
+    //LoopHintAttr::LoopHintState State = LoopHintAttr::Disable;
+    //unsigned ValueInt = 1;
+    SmallVector<LoopHintAttr::LoopHintState, 1> States;
+    SmallVector<unsigned, 1> ValuesInt;
+
     // Translate opencl_unroll_hint attribute argument to
     // equivalent LoopHintAttr enums.
     // OpenCL v2.0 s6.11.5:
@@ -600,24 +703,32 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
     // 1 - disable unroll.
     // other positive integer n - unroll by n.
     if (OpenCLHint) {
-      ValueInt = OpenCLHint->getUnrollHint();
-      if (ValueInt == 0) {
-        State = LoopHintAttr::Enable;
-      } else if (ValueInt != 1) {
+      ValuesInt.push_back(OpenCLHint->getUnrollHint());
+      if (ValuesInt[0] == 0) {
+        States.push_back(LoopHintAttr::Enable);
+      } else if (ValuesInt[0] != 1) {
         Option = LoopHintAttr::UnrollCount;
-        State = LoopHintAttr::Numeric;
+        States.push_back(LoopHintAttr::Numerics);
       }
     } else if (LH) {
-      auto *ValueExpr = LH->getValue();
-      if (ValueExpr) {
-        llvm::APSInt ValueAPS = ValueExpr->EvaluateKnownConstInt(Ctx);
-        ValueInt = ValueAPS.getSExtValue();
-      }
-
       Option = LH->getOption();
-      State = LH->getState();
+      for (auto *it = LH->values_begin(); it != LH->values_end(); ++it) {
+        auto *ValueExpr = *it;
+        llvm::APSInt ValueAPS = ValueExpr->EvaluateKnownConstInt(Ctx);
+        ValuesInt.push_back(ValueAPS.getSExtValue());
+      }
+      for (auto *it = LH->radiuses_begin(); it != LH->radiuses_end(); ++it) {
+        auto *ValueExpr = *it;
+        llvm::APSInt ValueAPS = ValueExpr->EvaluateKnownConstInt(Ctx);
+        ValuesInt.push_back(ValueAPS.getSExtValue());
+      }
+      for (auto *State = LH->states_begin(); State != LH->states_end(); ++State) {
+        States.push_back(*State);
+      }
     }
-    switch (State) {
+
+    bool PragmaOptionLoopScheme = false;
+    switch (States[0]) {
     case LoopHintAttr::Disable:
       switch (Option) {
       case LoopHintAttr::Vectorize:
@@ -648,6 +759,10 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
       case LoopHintAttr::VectorizeWidth:
       case LoopHintAttr::InterleaveCount:
       case LoopHintAttr::PipelineInitiationInterval:
+      case LoopHintAttr::TemporalBlocking:
+      case LoopHintAttr::Scheme:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
         llvm_unreachable("Options cannot be disabled.");
         break;
       }
@@ -676,6 +791,10 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
       case LoopHintAttr::InterleaveCount:
       case LoopHintAttr::PipelineDisabled:
       case LoopHintAttr::PipelineInitiationInterval:
+      case LoopHintAttr::TemporalBlocking:
+      case LoopHintAttr::Scheme:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
         llvm_unreachable("Options cannot enabled.");
         break;
       }
@@ -698,6 +817,10 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
       case LoopHintAttr::Distribute:
       case LoopHintAttr::PipelineDisabled:
       case LoopHintAttr::PipelineInitiationInterval:
+      case LoopHintAttr::TemporalBlocking:
+      case LoopHintAttr::Scheme:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
         llvm_unreachable("Options cannot be used to assume mem safety.");
         break;
       }
@@ -720,26 +843,38 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
       case LoopHintAttr::PipelineDisabled:
       case LoopHintAttr::PipelineInitiationInterval:
       case LoopHintAttr::VectorizePredicate:
+      case LoopHintAttr::TemporalBlocking:
+      case LoopHintAttr::Scheme:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
         llvm_unreachable("Options cannot be used with 'full' hint.");
         break;
       }
       break;
-    case LoopHintAttr::Numeric:
+    case LoopHintAttr::Numerics:
       switch (Option) {
       case LoopHintAttr::VectorizeWidth:
-        setVectorizeWidth(ValueInt);
+        setVectorizeWidth(ValuesInt[0]);
         break;
       case LoopHintAttr::InterleaveCount:
-        setInterleaveCount(ValueInt);
+        setInterleaveCount(ValuesInt[0]);
         break;
       case LoopHintAttr::UnrollCount:
-        setUnrollCount(ValueInt);
+        setUnrollCount(ValuesInt[0]);
         break;
       case LoopHintAttr::UnrollAndJamCount:
-        setUnrollAndJamCount(ValueInt);
+        setUnrollAndJamCount(ValuesInt[0]);
         break;
       case LoopHintAttr::PipelineInitiationInterval:
-        setPipelineInitiationInterval(ValueInt);
+        setPipelineInitiationInterval(ValuesInt[0]);
+        break;
+      case LoopHintAttr::TileSize:
+        setTemporalBlockingEnabled();
+        setTileSizes(ValuesInt);
+        break;
+      case LoopHintAttr::Radius:
+        setTemporalBlockingEnabled();
+        setRadiuses(ValuesInt);
         break;
       case LoopHintAttr::Unroll:
       case LoopHintAttr::UnrollAndJam:
@@ -748,10 +883,87 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
       case LoopHintAttr::Interleave:
       case LoopHintAttr::Distribute:
       case LoopHintAttr::PipelineDisabled:
+      case LoopHintAttr::TemporalBlocking:
+      case LoopHintAttr::Scheme:
         llvm_unreachable("Options cannot be assigned a value.");
         break;
       }
       break;
+    case LoopHintAttr::Diamond:
+      switch (Option) {
+      case LoopHintAttr::VectorizeWidth:
+      case LoopHintAttr::InterleaveCount:
+      case LoopHintAttr::UnrollCount:
+      case LoopHintAttr::Unroll:
+      case LoopHintAttr::UnrollAndJam:
+      case LoopHintAttr::Vectorize:
+      case LoopHintAttr::Interleave:
+      case LoopHintAttr::Distribute:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
+      case LoopHintAttr::TemporalBlocking:
+        llvm_unreachable("Options cannot be used with 'diamond' hint.");
+        break;
+      case LoopHintAttr::Scheme:
+        PragmaOptionLoopScheme = true;
+        break;
+      }
+      break;
+    case LoopHintAttr::Wavefront:
+      switch (Option) {
+      case LoopHintAttr::VectorizeWidth:
+      case LoopHintAttr::InterleaveCount:
+      case LoopHintAttr::UnrollCount:
+      case LoopHintAttr::Unroll:
+      case LoopHintAttr::UnrollAndJam:
+      case LoopHintAttr::Vectorize:
+      case LoopHintAttr::Interleave:
+      case LoopHintAttr::Distribute:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
+      case LoopHintAttr::TemporalBlocking:
+        llvm_unreachable("Options cannot be used with 'wavefront' hint.");
+        break;
+      case LoopHintAttr::Scheme:
+        PragmaOptionLoopScheme = true;
+        break;
+      }
+      break;
+    case LoopHintAttr::Trapezoid:
+      switch (Option) {
+      case LoopHintAttr::VectorizeWidth:
+      case LoopHintAttr::InterleaveCount:
+      case LoopHintAttr::UnrollCount:
+      case LoopHintAttr::Unroll:
+      case LoopHintAttr::UnrollAndJam:
+      case LoopHintAttr::Vectorize:
+      case LoopHintAttr::Interleave:
+      case LoopHintAttr::Distribute:
+      case LoopHintAttr::TileSize:
+      case LoopHintAttr::Radius:
+      case LoopHintAttr::TemporalBlocking:
+        llvm_unreachable("Options cannot be used with 'traoezoid' hint.");
+        break;
+      case LoopHintAttr::Scheme:
+        PragmaOptionLoopScheme = true;
+        break;
+      }
+      break;
+    }
+
+    if (PragmaOptionLoopScheme) {
+      SmallVector<LoopAttributes::TemporalBlockingScheme, 1> tmp;
+      for (unsigned i = 0u; i < States.size(); ++i) {
+        if (States[i] == LoopHintAttr::Diamond) {
+          tmp.push_back(LoopAttributes::Diamond);
+        } else if (States[i] == LoopHintAttr::Wavefront) {
+          tmp.push_back(LoopAttributes::Wavefront);
+        } else if (States[i] == LoopHintAttr::Trapezoid) {
+          tmp.push_back(LoopAttributes::Trapezoid);
+        }
+      }
+      setTemporalBlockingEnabled();
+      setSchemes(tmp);
     }
   }
 

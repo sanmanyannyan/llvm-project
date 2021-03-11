@@ -26,17 +26,18 @@ void LoopHintAttr::printPrettyPragma(raw_ostream &OS,
     return;
   else if (SpellingIndex == Pragma_unroll ||
            SpellingIndex == Pragma_unroll_and_jam) {
-    OS << ' ' << getValueString(Policy);
+    OS << ' ' << getValuesString(Policy);
     return;
   }
 
   assert(SpellingIndex == Pragma_clang_loop && "Unexpected spelling");
-  OS << ' ' << getOptionName(option) << getValueString(Policy);
+  OS << ' ' << getOptionName(option) << getValuesString(Policy);
 }
 
 // Return a string containing the loop hint argument including the
 // enclosing parentheses.
-std::string LoopHintAttr::getValueString(const PrintingPolicy &Policy) const {
+std::string LoopHintAttr::getValuesString(const PrintingPolicy &Policy) const {
+#if 0
   std::string ValueName;
   llvm::raw_string_ostream OS(ValueName);
   OS << "(";
@@ -52,6 +53,47 @@ std::string LoopHintAttr::getValueString(const PrintingPolicy &Policy) const {
     OS << "disable";
   OS << ")";
   return OS.str();
+#endif
+
+  std::string ValueName;
+  llvm::raw_string_ostream OS(ValueName);
+  auto print_value = [&](int index){
+      if (states_[index] == Numerics){
+        if (values_Size > 0u){
+          OS << "[";
+          (values_[0])->printPretty(OS, nullptr, Policy);
+          for(unsigned j=1u ; j<values_Size ; ++j){
+            OS << ", ";
+            (values_[j])->printPretty(OS, nullptr, Policy);
+          }
+          OS << "]";
+        }
+      }else if (states_[index] == Enable)
+        OS << "enable";
+      else if (states_[index] == Full)
+        OS << "full";
+      else if (states_[index] == AssumeSafety)
+        OS << "assume_safety";
+      else if (states_[index] == Wavefront)
+        OS << "wavefront";
+      else if (states_[index] == Diamond)
+        OS << "diamond";
+      else if (states_[index] == Trapezoid)
+        OS << "trapezoid";
+      else
+        OS << "disable";
+  };
+  OS << "(";
+    if(states_Size > 0){
+      print_value(0);
+      for(unsigned i=1u ; i<states_Size ; ++i){
+        OS << ", ";
+        print_value(i);
+      }
+    }
+    OS << ")";
+    return OS.str();
+
 }
 
 // Return a string suitable for identifying this attribute in diagnostics.
@@ -62,15 +104,17 @@ LoopHintAttr::getDiagnosticName(const PrintingPolicy &Policy) const {
     return "#pragma nounroll";
   else if (SpellingIndex == Pragma_unroll)
     return "#pragma unroll" +
-           (option == UnrollCount ? getValueString(Policy) : "");
+           (option == UnrollCount ? getValuesString(Policy) : "");
   else if (SpellingIndex == Pragma_nounroll_and_jam)
     return "#pragma nounroll_and_jam";
   else if (SpellingIndex == Pragma_unroll_and_jam)
     return "#pragma unroll_and_jam" +
-           (option == UnrollAndJamCount ? getValueString(Policy) : "");
+           (option == UnrollAndJamCount ? getValuesString(Policy) : "");
+  else if (SpellingIndex == Pragma_temporal_blocking)
+    return "#pragma temporal_blocking" + (option == TileSize ? getValuesString(Policy) : "");
 
   assert(SpellingIndex == Pragma_clang_loop && "Unexpected spelling");
-  return getOptionName(option) + getValueString(Policy);
+  return getOptionName(option) + getValuesString(Policy);
 }
 
 void OMPDeclareSimdDeclAttr::printPrettyPragma(

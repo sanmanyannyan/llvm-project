@@ -78,12 +78,28 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
                                 SourceRange) {
   IdentifierLoc *PragmaNameLoc = A.getArgAsIdent(0);
   IdentifierLoc *OptionLoc = A.getArgAsIdent(1);
-  IdentifierLoc *StateLoc = A.getArgAsIdent(2);
-  Expr *ValueExpr = A.getArgAsExpr(3);
+  SmallVector<IdentifierLoc *, 1> StateLocs;
+  SmallVector<Expr *, 1> ValueExprs;
+  SmallVector<Expr *, 1> Radiuses;
+  SmallVector<LoopHintAttr::LoopHintState, 1> States;
+  bool IsRadius = llvm::StringSwitch<bool>(OptionLoc->Ident->getName())
+                      .Case("radius", true)
+                      .Default(false);
+  for (unsigned i = 2u; i < A.getNumArgs(); ++i) {
+    if (A.isArgExpr(i)) {
+      if (IsRadius)
+        Radiuses.push_back(A.getArgAsExpr(i));
+      else
+        ValueExprs.push_back(A.getArgAsExpr(i));
+    } else if (A.isArgIdent(i)) {
+      StateLocs.push_back(A.getArgAsIdent(i));
+    }
+  }
 
   StringRef PragmaName =
       llvm::StringSwitch<StringRef>(PragmaNameLoc->Ident->getName())
           .Cases("unroll", "nounroll", "unroll_and_jam", "nounroll_and_jam",
+                 "temporal_blocking",
                  PragmaNameLoc->Ident->getName())
           .Default("clang loop");
 
@@ -109,18 +125,41 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
     SetHints(LoopHintAttr::Unroll, LoopHintAttr::Disable);
   } else if (PragmaName == "unroll") {
     // #pragma unroll N
-    if (ValueExpr)
-      SetHints(LoopHintAttr::UnrollCount, LoopHintAttr::Numeric);
-    else
+    if (ValueExprs.size() > 0) {
+      SetHints(LoopHintAttr::UnrollCount, LoopHintAttr::Numerics);
+    } else {
       SetHints(LoopHintAttr::Unroll, LoopHintAttr::Enable);
+    }
   } else if (PragmaName == "nounroll_and_jam") {
     SetHints(LoopHintAttr::UnrollAndJam, LoopHintAttr::Disable);
   } else if (PragmaName == "unroll_and_jam") {
     // #pragma unroll_and_jam N
-    if (ValueExpr)
-      SetHints(LoopHintAttr::UnrollAndJamCount, LoopHintAttr::Numeric);
+    if (ValueExprs.size() > 0)
+      SetHints(LoopHintAttr::UnrollAndJamCount, LoopHintAttr::Numerics);
     else
       SetHints(LoopHintAttr::UnrollAndJam, LoopHintAttr::Enable);
+  } else if (PragmaName == "temporal_blocking") {
+    Option = llvm::StringSwitch<LoopHintAttr::OptionType>(
+                 OptionLoc->Ident->getName())
+                 .Case("tile_size", LoopHintAttr::TileSize)
+                 .Case("radius", LoopHintAttr::Radius)
+                 .Default(LoopHintAttr::Scheme);
+    if (ValueExprs.size() > 0 || Radiuses.size() > 0) {
+      States.push_back(LoopHintAttr::Numerics);
+    } else if (StateLocs.size()) {
+      // Scheme
+      for (unsigned i = 0u; i < StateLocs.size(); ++i) {
+        if (StateLocs[i] && StateLocs[i]->Ident) {
+          if (StateLocs[i]->Ident->getName() == "diamond") {
+            States.push_back(LoopHintAttr::Diamond);
+          } else if (StateLocs[i]->Ident->getName() == "wavefront") {
+            States.push_back(LoopHintAttr::Wavefront);
+          } else if (StateLocs[i]->Ident->getName() == "trapezoid") {
+            States.push_back(LoopHintAttr::Trapezoid);
+          }
+        }
+      }
+    }
   } else {
     // #pragma clang loop ...
     assert(OptionLoc && OptionLoc->Ident &&
@@ -143,24 +182,26 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
         Option == LoopHintAttr::InterleaveCount ||
         Option == LoopHintAttr::UnrollCount ||
         Option == LoopHintAttr::PipelineInitiationInterval) {
-      assert(ValueExpr && "Attribute must have a valid value expression.");
-      if (S.CheckLoopHintExpr(ValueExpr, St->getBeginLoc()))
+      assert(ValueExprs.size() > 0 &&
+             "Attribute must have a valid value expression.");
+      if (S.CheckLoopHintExpr(ValueExprs[0], St->getBeginLoc()))
         return nullptr;
-      State = LoopHintAttr::Numeric;
+      State = LoopHintAttr::Numerics;
     } else if (Option == LoopHintAttr::Vectorize ||
                Option == LoopHintAttr::Interleave ||
                Option == LoopHintAttr::VectorizePredicate ||
                Option == LoopHintAttr::Unroll ||
                Option == LoopHintAttr::Distribute ||
                Option == LoopHintAttr::PipelineDisabled) {
-      assert(StateLoc && StateLoc->Ident && "Loop hint must have an argument");
-      if (StateLoc->Ident->isStr("disable"))
+      assert(StateLocs.size() && StateLocs[0]->Ident &&
+             "Loop hint must have an argument");
+      if (StateLocs[0]->Ident->isStr("disable"))
         State = LoopHintAttr::Disable;
-      else if (StateLoc->Ident->isStr("assume_safety"))
+      else if (StateLocs[0]->Ident->isStr("assume_safety"))
         State = LoopHintAttr::AssumeSafety;
-      else if (StateLoc->Ident->isStr("full"))
+      else if (StateLocs[0]->Ident->isStr("full"))
         State = LoopHintAttr::Full;
-      else if (StateLoc->Ident->isStr("enable"))
+      else if (StateLocs[0]->Ident->isStr("enable"))
         State = LoopHintAttr::Enable;
       else
         llvm_unreachable("bad loop hint argument");
@@ -168,7 +209,14 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
       llvm_unreachable("bad loop hint");
   }
 
-  return LoopHintAttr::CreateImplicit(S.Context, Option, State, ValueExpr, A);
+  if (PragmaName != "temporal_blocking") {
+    States.push_back(State);
+  }
+
+  return LoopHintAttr::CreateImplicit(
+      S.Context, Option, States.data(), States.size(),
+      ValueExprs.data(), ValueExprs.size(), Radiuses.data(), Radiuses.size(),
+      A.getRange());
 }
 
 namespace {
@@ -226,7 +274,8 @@ CheckForIncompatibleAttributes(Sema &S,
     const LoopHintAttr *NumericAttr;
   } HintAttrs[] = {{nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
                    {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
-                   {nullptr, nullptr}};
+                   {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
+                   {nullptr, nullptr}, {nullptr, nullptr}};
 
   for (const auto *I : Attrs) {
     const LoopHintAttr *LH = dyn_cast<LoopHintAttr>(I);
@@ -243,7 +292,11 @@ CheckForIncompatibleAttributes(Sema &S,
       UnrollAndJam,
       Distribute,
       Pipeline,
-      VectorizePredicate
+      VectorizePredicate,
+      TemporalBlocking,
+      TemporalBlockingScheme,
+      TemporalBlockingTileSize,
+      TemporalBlockingRadius,
     } Category;
     switch (Option) {
     case LoopHintAttr::Vectorize:
@@ -272,6 +325,18 @@ CheckForIncompatibleAttributes(Sema &S,
       break;
     case LoopHintAttr::VectorizePredicate:
       Category = VectorizePredicate;
+      break;
+    case LoopHintAttr::TemporalBlocking:
+      Category = TemporalBlocking;
+      break;
+    case LoopHintAttr::Scheme:
+      Category = TemporalBlockingScheme;
+      break;
+    case LoopHintAttr::TileSize:
+      Category = TemporalBlockingTileSize;
+      break;
+    case LoopHintAttr::Radius:
+      Category = TemporalBlockingRadius;
       break;
     };
 
@@ -303,7 +368,7 @@ CheckForIncompatibleAttributes(Sema &S,
 
     if (CategoryState.StateAttr && CategoryState.NumericAttr &&
         (Category == Unroll || Category == UnrollAndJam ||
-         CategoryState.StateAttr->getState() == LoopHintAttr::Disable)) {
+         *(CategoryState.StateAttr->states_begin()) == LoopHintAttr::Disable)) {
       // Disable hints are not compatible with numeric hints of the same
       // category.  As a special case, numeric unroll hints are also not
       // compatible with enable or full form of the unroll pragma because these

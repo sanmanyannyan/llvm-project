@@ -227,6 +227,12 @@ struct PragmaLoopHintHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
+struct PragmaTemporalBlockingHandler : public PragmaHandler {
+  PragmaTemporalBlockingHandler(const char *name) : PragmaHandler(name) {}
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override;
+};
+
 struct PragmaUnrollHintHandler : public PragmaHandler {
   PragmaUnrollHintHandler(const char *name) : PragmaHandler(name) {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
@@ -384,6 +390,9 @@ void Parser::initializePragmaHandlers() {
   LoopHintHandler = std::make_unique<PragmaLoopHintHandler>();
   PP.AddPragmaHandler("clang", LoopHintHandler.get());
 
+  TemporalBlockingHandler = std::make_unique<PragmaTemporalBlockingHandler>("temporal_blocking");
+  PP.AddPragmaHandler(TemporalBlockingHandler.get());
+
   UnrollHintHandler = std::make_unique<PragmaUnrollHintHandler>("unroll");
   PP.AddPragmaHandler(UnrollHintHandler.get());
 
@@ -499,6 +508,9 @@ void Parser::resetPragmaHandlers() {
 
   PP.RemovePragmaHandler("clang", LoopHintHandler.get());
   LoopHintHandler.reset();
+
+  PP.RemovePragmaHandler(TemporalBlockingHandler.get());
+  TemporalBlockingHandler.reset();
 
   PP.RemovePragmaHandler(UnrollHintHandler.get());
   UnrollHintHandler.reset();
@@ -1090,7 +1102,7 @@ bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
   // without an argument.
   auto IsLoopHint = llvm::StringSwitch<bool>(PragmaNameInfo->getName())
                         .Cases("unroll", "nounroll", "unroll_and_jam",
-                               "nounroll_and_jam", true)
+                               "nounroll_and_jam", "temporal_blocking", true)
                         .Default(false);
 
   if (Toks.empty() && IsLoopHint) {
@@ -1106,12 +1118,18 @@ bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
 
   // If no option is specified the argument is assumed to be a constant expr.
   bool OptionUnroll = false;
+  bool OptionScheme = false;
+  bool OptionTileSize = false;
+  bool OptionRadius = false;
   bool OptionUnrollAndJam = false;
   bool OptionDistribute = false;
   bool OptionPipelineDisabled = false;
   bool StateOption = false;
   if (OptionInfo) { // Pragma Unroll does not specify an option.
     OptionUnroll = OptionInfo->isStr("unroll");
+    OptionScheme = OptionInfo->isStr("scheme");
+    OptionTileSize = OptionInfo->isStr("tile_size");
+    OptionRadius = OptionInfo->isStr("radius");
     OptionUnrollAndJam = OptionInfo->isStr("unroll_and_jam");
     OptionDistribute = OptionInfo->isStr("distribute");
     OptionPipelineDisabled = OptionInfo->isStr("pipeline");
@@ -1121,7 +1139,8 @@ bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
                       .Case("vectorize_predicate", true)
                       .Default(false) ||
                   OptionUnroll || OptionUnrollAndJam || OptionDistribute ||
-                  OptionPipelineDisabled;
+                  OptionPipelineDisabled ||
+                  OptionScheme;
   }
 
   bool AssumeSafetyArg = !OptionUnroll && !OptionUnrollAndJam &&
@@ -1139,55 +1158,123 @@ bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
   // Validate the argument.
   if (StateOption) {
     ConsumeAnnotationToken();
-    SourceLocation StateLoc = Toks[0].getLocation();
-    IdentifierInfo *StateInfo = Toks[0].getIdentifierInfo();
-
-    bool Valid = StateInfo &&
-                 llvm::StringSwitch<bool>(StateInfo->getName())
-                     .Case("disable", true)
-                     .Case("enable", !OptionPipelineDisabled)
-                     .Case("full", OptionUnroll || OptionUnrollAndJam)
-                     .Case("assume_safety", AssumeSafetyArg)
-                     .Default(false);
-    if (!Valid) {
-      if (OptionPipelineDisabled) {
-        Diag(Toks[0].getLocation(), diag::err_pragma_pipeline_invalid_keyword);
-      } else {
-        Diag(Toks[0].getLocation(), diag::err_pragma_invalid_keyword)
-            << /*FullKeyword=*/(OptionUnroll || OptionUnrollAndJam)
-            << /*AssumeSafetyKeyword=*/AssumeSafetyArg;
+    if (OptionScheme) {
+      for (size_t i = 0; i < Toks.size(); ++i) {
+        if (Toks[i].is(tok::comma))
+          continue;
+        if (Toks[i].is(tok::eof))
+          break;
+        if (Toks[i].isNot(tok::identifier))
+          return false;
+        SourceLocation SchemeLoc = Toks[i].getLocation();
+        IdentifierInfo *SchemeInfo = Toks[i].getIdentifierInfo();
+        bool Valid =
+            SchemeInfo && llvm::StringSwitch<bool>(SchemeInfo->getName())
+                              .Cases("trapezoid", "diamond", "wavefront", true)
+                              .Default(false);
+        if (!Valid) {
+          Diag(Toks[i].getLocation(), diag::err_pragma_invalid_keyword)
+              << /*FullKeyword=*/OptionScheme
+              << /*AssumeSafetyKeyword=*/AssumeSafetyArg;
+          return false;
+        }
+        
+        Hint.Schemes.push_back(
+            IdentifierLoc::create(Actions.Context, SchemeLoc, SchemeInfo));
       }
-      return false;
+    } else {
+      SourceLocation StateLoc = Toks[0].getLocation();
+      IdentifierInfo *StateInfo = Toks[0].getIdentifierInfo();
+
+      bool Valid =
+          StateInfo && llvm::StringSwitch<bool>(StateInfo->getName())
+                           .Case("disable", true)
+                           .Case("enable", !OptionPipelineDisabled)
+                           .Case("full", OptionUnroll || OptionUnrollAndJam)
+                           .Case("assume_safety", AssumeSafetyArg)
+                           .Default(false);
+      if (!Valid) {
+        if (OptionPipelineDisabled) {
+          Diag(Toks[0].getLocation(),
+               diag::err_pragma_pipeline_invalid_keyword);
+        } else {
+          Diag(Toks[0].getLocation(), diag::err_pragma_invalid_keyword)
+              << /*FullKeyword=*/(OptionUnroll || OptionUnrollAndJam)
+              << /*AssumeSafetyKeyword=*/AssumeSafetyArg;
+        }
+        return false;
+      }
+      if (Toks.size() > 2)
+        Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+            << PragmaLoopHintString(Info->PragmaName, Info->Option);
+      Hint.StateLoc =
+          IdentifierLoc::create(Actions.Context, StateLoc, StateInfo);
     }
-    if (Toks.size() > 2)
-      Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
-          << PragmaLoopHintString(Info->PragmaName, Info->Option);
-    Hint.StateLoc = IdentifierLoc::create(Actions.Context, StateLoc, StateInfo);
   } else {
-    // Enter constant expression including eof terminator into token stream.
-    PP.EnterTokenStream(Toks, /*DisableMacroExpansion=*/false,
-                        /*IsReinject=*/false);
-    ConsumeAnnotationToken();
+    if (OptionTileSize || OptionRadius) {
+      // comma seperated constant numerics expression 
+      int number_of_expressions = 1;
+      SmallVector<Token, 100> TokenVector;
+      SmallVector<clang::Expr*, 1> ConstantExprs;
+      Token EoF;
+      EoF.startToken();
+      EoF.setKind(tok::eof);
+      bool annotation_token_is_still_in_pp = true;
+      for (int i = 0; i < Toks.size(); ++i) {
+        if (Toks[i].is(tok::comma) || Toks[i].is(tok::eof)) {
+          TokenVector.push_back(EoF);
+          PP.EnterTokenStream(TokenVector, /*DisableMacroExpansion=*/false,
+                              /*IsReinject=*/false);
+          if (annotation_token_is_still_in_pp) {
+            ConsumeAnnotationToken();
+            annotation_token_is_still_in_pp = false;
+          } else {
+            ConsumeToken();
+          }
+          ExprResult R = ParseConstantExpression();
 
-    ExprResult R = ParseConstantExpression();
+          if (R.isInvalid() ||
+              Actions.CheckLoopHintExpr(R.get(), Toks[0].getLocation()))
+            return false;
+          ConstantExprs.push_back(R.get());
+          TokenVector.clear();
+          continue;
+        }
+        if (Toks[i].is(tok::eof)) break;
+        TokenVector.push_back(Toks[i]);
+      }
+      if (OptionTileSize) {
+        Hint.TileSizes = ConstantExprs;
+      } else {
+        Hint.Radiuses = ConstantExprs;
+      }
+      ConsumeToken();
+    } else {
+      // Enter constant expression including eof terminator into token stream.
+      PP.EnterTokenStream(Toks, /*DisableMacroExpansion=*/false,
+                          /*IsReinject=*/false);
+      ConsumeAnnotationToken();
 
-    // Tokens following an error in an ill-formed constant expression will
-    // remain in the token stream and must be removed.
-    if (Tok.isNot(tok::eof)) {
-      Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
-          << PragmaLoopHintString(Info->PragmaName, Info->Option);
-      while (Tok.isNot(tok::eof))
-        ConsumeAnyToken();
+      ExprResult R = ParseConstantExpression();
+
+      // Tokens following an error in an ill-formed constant expression will
+      // remain in the token stream and must be removed.
+      if (Tok.isNot(tok::eof)) {
+        Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+            << PragmaLoopHintString(Info->PragmaName, Info->Option);
+        while (Tok.isNot(tok::eof))
+          ConsumeAnyToken();
+      }
+
+      ConsumeToken(); // Consume the constant expression eof terminator.
+
+      if (R.isInvalid() ||
+          Actions.CheckLoopHintExpr(R.get(), Toks[0].getLocation()))
+        return false;
+
+      // Argument is a constant expression with an integer type.
+      Hint.ValueExpr = R.get();
     }
-
-    ConsumeToken(); // Consume the constant expression eof terminator.
-
-    if (R.isInvalid() ||
-        Actions.CheckLoopHintExpr(R.get(), Toks[0].getLocation()))
-      return false;
-
-    // Argument is a constant expression with an integer type.
-    Hint.ValueExpr = R.get();
   }
 
   Hint.Range = SourceRange(Info->PragmaName.getLocation(),
@@ -3108,6 +3195,71 @@ void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
   if (Tok.isNot(tok::eod)) {
     PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
         << "clang loop";
+    return;
+  }
+
+  auto TokenArray = std::make_unique<Token[]>(TokenList.size());
+  std::copy(TokenList.begin(), TokenList.end(), TokenArray.get());
+
+  PP.EnterTokenStream(std::move(TokenArray), TokenList.size(),
+                      /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
+}
+
+void PragmaTemporalBlockingHandler::HandlePragma(Preprocessor &PP, 
+                                                 PragmaIntroducer Introducer,
+                                                 Token &Tok) {
+  // Incoming token is "temporal_blocking" from "#pragma temporal_blocking".
+  Token PragmaName = Tok;
+  SmallVector<Token, 1> TokenList;
+
+  // Lex the optimization option and verify it is an identifier.
+  PP.Lex(Tok);
+  if (Tok.isNot(tok::identifier)) {
+    PP.Diag(Tok.getLocation(), diag::err_pragma_loop_invalid_option)
+        << /*MissingOption=*/true << "";
+    return;
+  }
+
+  while (Tok.is(tok::identifier)) {
+    Token Option = Tok;
+    IdentifierInfo *OptionInfo = Tok.getIdentifierInfo();
+
+    bool OptionValid = llvm::StringSwitch<bool>(OptionInfo->getName())
+                           .Case("scheme", true)
+                           .Case("tile_size", true)
+                           .Case("radius", true)
+                           .Default(false);
+    if (!OptionValid) {
+      PP.Diag(Tok.getLocation(), diag::err_pragma_loop_invalid_option)
+          << /*MissingOption=*/false << OptionInfo;
+      return;
+    }
+    PP.Lex(Tok);
+
+    // Read '('
+    if (Tok.isNot(tok::l_paren)) {
+      PP.Diag(Tok.getLocation(), diag::err_expected) << tok::l_paren;
+      return;
+    }
+    PP.Lex(Tok);
+
+    auto *Info = new (PP.getPreprocessorAllocator()) PragmaLoopHintInfo;
+    if (ParseLoopHintValue(PP, Tok, PragmaName, Option, /*ValueInParens=*/true,
+                           *Info))
+      return;
+
+    // Generate the loop hint token.
+    Token LoopHintTok;
+    LoopHintTok.startToken();
+    LoopHintTok.setKind(tok::annot_pragma_loop_hint);
+    LoopHintTok.setLocation(PragmaName.getLocation());
+    LoopHintTok.setAnnotationEndLoc(PragmaName.getLocation());
+    LoopHintTok.setAnnotationValue(static_cast<void *>(Info));
+    TokenList.push_back(LoopHintTok);
+  }
+
+  if (Tok.isNot(tok::eod)) {
+    PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol) << "temporal_blocking";
     return;
   }
 

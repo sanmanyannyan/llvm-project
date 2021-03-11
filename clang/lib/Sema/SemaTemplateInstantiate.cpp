@@ -1514,9 +1514,9 @@ TemplateInstantiator::TransformTemplateParmRefExpr(DeclRefExpr *E,
 
 const LoopHintAttr *
 TemplateInstantiator::TransformLoopHintAttr(const LoopHintAttr *LH) {
-  Expr *TransformedExpr = getDerived().TransformExpr(LH->getValue()).get();
+  Expr *TransformedExpr = getDerived().TransformExpr(*(LH->values_begin())).get();
 
-  if (TransformedExpr == LH->getValue())
+  if (TransformedExpr == *(LH->values_begin()))
     return LH;
 
   // Generate error if there is a problem with the value.
@@ -1526,7 +1526,10 @@ TemplateInstantiator::TransformLoopHintAttr(const LoopHintAttr *LH) {
   // Create new LoopHintValueAttr with integral expression in place of the
   // non-type template parameter.
   return LoopHintAttr::CreateImplicit(getSema().Context, LH->getOption(),
-                                      LH->getState(), TransformedExpr, *LH);
+                                      LH->states_begin(), LH->states_size(),
+                                      LH->values_begin(), LH->values_size(),
+                                      LH->radiuses_begin(), LH->radiuses_size(),
+                                      LH->getRange());
 }
 
 ExprResult TemplateInstantiator::transformNonTypeTemplateParmRef(

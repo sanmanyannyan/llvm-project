@@ -2194,11 +2194,24 @@ StmtResult Parser::ParsePragmaLoopHint(StmtVector &Stmts,
     LoopHint Hint;
     if (!HandlePragmaLoopHint(Hint))
       continue;
-
-    ArgsUnion ArgHints[] = {Hint.PragmaNameLoc, Hint.OptionLoc, Hint.StateLoc,
-                            ArgsUnion(Hint.ValueExpr)};
+    SmallVector<ArgsUnion, 1> ArgHints = {Hint.PragmaNameLoc, Hint.OptionLoc,
+                                          Hint.StateLoc};
+    if (Hint.OptionLoc->Ident && Hint.OptionLoc->Ident->getName() == "scheme") {
+      for (auto it = Hint.Schemes.begin(); it != Hint.Schemes.end(); ++it)
+        ArgHints.push_back(ArgsUnion(*it));
+    } else if (Hint.OptionLoc->Ident &&
+               Hint.OptionLoc->Ident->getName() == "tile_size") {
+      for (auto it = Hint.TileSizes.begin(); it != Hint.TileSizes.end(); ++it)
+        ArgHints.push_back(ArgsUnion(*it));
+    } else if (Hint.OptionLoc->Ident &&
+               Hint.OptionLoc->Ident->getName() == "radius") {
+      for (auto it = Hint.Radiuses.begin(); it != Hint.Radiuses.end(); ++it)
+        ArgHints.push_back(ArgsUnion(*it));
+    } else {
+      ArgHints.push_back(ArgsUnion(Hint.ValueExpr));
+    }
     TempAttrs.addNew(Hint.PragmaNameLoc->Ident, Hint.Range, nullptr,
-                     Hint.PragmaNameLoc->Loc, ArgHints, 4,
+                     Hint.PragmaNameLoc->Loc, ArgHints.data(), ArgHints.size(),
                      ParsedAttr::AS_Pragma);
   }
 
